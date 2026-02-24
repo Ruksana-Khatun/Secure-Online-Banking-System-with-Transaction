@@ -52,7 +52,12 @@ export async function requestOtp(req, res) {
 
     return res.json({ message: "OTP sent", otpId: otp._id, expiresAt });
   } catch (e) {
-    return res.status(500).json({ error: "Failed to send OTP" });
+    console.error("requestOtp failed:", e);
+    const details =
+      process.env.NODE_ENV && process.env.NODE_ENV.toLowerCase() === "production"
+        ? undefined
+        : e?.message || String(e);
+    return res.status(500).json(details ? { error: "Failed to send OTP", details } : { error: "Failed to send OTP" });
   }
 }
 
@@ -80,7 +85,8 @@ export async function verifyOtp(req, res) {
     });
 
     return res.json({ message: "OTP verified", purpose: otp.purpose });
-  } catch {
+  } catch (e) {
+    console.error("verifyOtp failed:", e);
     return res.status(500).json({ error: "Failed to verify OTP" });
   }
 }

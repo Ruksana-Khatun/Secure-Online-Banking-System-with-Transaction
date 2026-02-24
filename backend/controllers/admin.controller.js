@@ -6,14 +6,14 @@ export async function listUsers(req, res) {
   const { q, status, page = 1, limit = 20 } = req.query;
   const filter = {};
   if (q) filter.$or = [
-    { name: new RegExp(q, "i") },
+    { fullName: new RegExp(q, "i") },
     { email: new RegExp(q, "i") }
   ];
   if (status) filter.status = status;
 
   const skip = (Number(page) - 1) * Number(limit);
   const [items, total] = await Promise.all([
-    User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).select("-password"),
+    User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).select("-passwordHash"),
     User.countDocuments(filter)
   ]);
 
@@ -22,7 +22,7 @@ export async function listUsers(req, res) {
 
 export async function suspendUser(req, res) {
   const { id } = req.params;
-  const user = await User.findByIdAndUpdate(id, { status: "SUSPENDED" }, { new: true }).select("-password");
+  const user = await User.findByIdAndUpdate(id, { status: "SUSPENDED" }, { new: true }).select("-passwordHash");
   if (!user) return res.status(404).json({ error: "User not found" });
 
   await AuditLog.create({
@@ -38,7 +38,7 @@ export async function suspendUser(req, res) {
 
 export async function activateUser(req, res) {
   const { id } = req.params;
-  const user = await User.findByIdAndUpdate(id, { status: "ACTIVE" }, { new: true }).select("-password");
+  const user = await User.findByIdAndUpdate(id, { status: "ACTIVE" }, { new: true }).select("-passwordHash");
   if (!user) return res.status(404).json({ error: "User not found" });
 
   await AuditLog.create({
@@ -59,7 +59,9 @@ export async function listTransactions(req, res) {
   const skip = (Number(page) - 1) * Number(limit);
   const [items, total] = await Promise.all([
     Transaction.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit))
-      .populate("fromAccount toAccount initiatedBy", "accountNumber email name"),
+      .populate("fromAccount", "accountNumber")
+      .populate("toAccount", "accountNumber")
+      .populate("initiatedBy", "email fullName"),
     Transaction.countDocuments(filter)
   ]);
 
@@ -74,7 +76,8 @@ export async function listAuditLogs(req, res) {
 
   const [items, total] = await Promise.all([
     AuditLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit))
-      .populate("actor targetUser", "email name"),
+      .populate("actor", "email fullName")
+      .populate("targetUser", "email fullName"),
     AuditLog.countDocuments(filter)
   ]);
 

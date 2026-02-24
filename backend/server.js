@@ -15,8 +15,17 @@ import accountRoutes from './routes/account.routes.js';
 import transactionRoutes from './routes/transaction.routes.js';
 import otpRoutes from "./routes/otp.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
+import legacyRoutes from "./routes/legacy.routes.js";
 
 dotenv.config();
+
+const requiredEnv = ["MONGO_URI", "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"];
+const missingEnv = requiredEnv.filter((k) => !process.env[k]);
+if (missingEnv.length) {
+  console.error(`Missing required env vars: ${missingEnv.join(", ")}`);
+  console.error("Create backend/.env (you can copy from backend/.env.example).");
+  process.exit(1);
+}
 
 
 const app = express();
@@ -27,9 +36,17 @@ app.use(helmet());
 app.use(hpp());
 app.use(compression());
 app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
 app.use(morgan('dev'));
-app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean)
+      : true,
+    credentials: true,
+  })
+);
 
 
 // Rate limiters
@@ -47,6 +64,7 @@ app.use('/api/accounts', accountRoutes);
 app.use('/api/transactions', transactionRoutes)
 app.use("/api/otp", otpRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/", legacyRoutes);
 
 
 app.get('/health', (_, res) => res.json({ ok: true }));

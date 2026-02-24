@@ -1,13 +1,34 @@
 import nodemailer from "nodemailer";
 
-export const mailer = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT || 587),
-  secure: false,
-  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-});
+function normalizeSmtpPass(pass) {
+  // Gmail app passwords are often shown with spaces; env values sometimes keep them.
+  return typeof pass === "string" ? pass.replace(/\s+/g, "") : pass;
+}
+
+function createMailerFromEnv() {
+  const smtpPort = Number(process.env.SMTP_PORT || 587);
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = normalizeSmtpPass(process.env.SMTP_PASS);
+  const smtpHost = process.env.SMTP_HOST;
+
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    throw new Error("SMTP is not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS)");
+  }
+
+  return nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    auth: { user: smtpUser, pass: smtpPass },
+  });
+}
 
 export async function sendOtpEmail(to, code, purpose = "Login") {
+  if (process.env.OTP_DEV_MODE === "1") {
+    console.log("OTP_DEV_MODE=1 (email skipped)", { to, code, purpose });
+    return;
+  }
+
   const from = process.env.APP_FROM_EMAIL || "no-reply@example.com";
   const subject = `Your ${purpose} OTP`;
   const html = `
@@ -17,5 +38,6 @@ export async function sendOtpEmail(to, code, purpose = "Login") {
       <div style="font-size:28px;font-weight:700;letter-spacing:4px">${code}</div>
       <p>This code expires in 5 minutes.</p>
     </div>`;
+  const mailer = createMailerFromEnv();
   await mailer.sendMail({ from, to, subject, html });
 }

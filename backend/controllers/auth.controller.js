@@ -33,6 +33,7 @@ try {
 const { email, password } = loginSchema.parse(req.body);
 const user = await User.findOne({ email });
 if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+if (user.status !== "ACTIVE") return res.status(403).json({ error: "User not active" });
 const ok = await bcrypt.compare(password, user.passwordHash);
 if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 const accessToken = signAccessToken({ id: user._id, role: user.role });
@@ -48,7 +49,10 @@ export async function refresh(req, res) {
 try {
 const { token } = req.body;
 const decoded = verifyRefresh(token);
-const accessToken = signAccessToken({ id: decoded.id, role: decoded.role });
+const user = await User.findById(decoded.id);
+if (!user) return res.status(401).json({ error: "Invalid refresh token" });
+if (user.status !== "ACTIVE") return res.status(403).json({ error: "User not active" });
+const accessToken = signAccessToken({ id: user._id, role: user.role });
 return res.json({ accessToken });
 } catch (e) {
 return res.status(401).json({ error: 'Invalid refresh token' });
