@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "seed:admin": "node scripts/seedAdmin.js"
   },
   "author": "Ruksana khatun",
   "license": "ISC",

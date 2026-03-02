@@ -1,43 +1,68 @@
-import mongoose from 'mongoose';
 import Account from '../models/Account.model.js';
 import Transaction from '../models/Transaction.model.js';
+import User from "../models/User.model.js";
+import OtpToken from "../models/OtpToken.js";
 export async function transfer(req, res) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
-    const { fromAccountId, toAccountNumber, amount, idempotencyKey } = req.body;
+    const { fromAccountId, toAccountNumber, amount, idempotencyKey, otpId, otpCode } = req.body;
 
-    const from = await Account.findOne({ _id: fromAccountId, user: req.user.id }).session(session);
-    const to = await Account.findOne({ accountNumber: toAccountNumber }).session(session);
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) throw new Error("Invalid amount");
+    if (!fromAccountId) throw new Error("fromAccountId required");
+    if (!toAccountNumber || String(toAccountNumber).trim().length < 4) throw new Error("toAccountNumber required");
+    if (!idempotencyKey) throw new Error("idempotencyKey required");
+
+    const user = await User.findById(req.user.id).select("require2FAForTransfers status");
+    if (!user) throw new Error("User not found");
+    if (user.status !== "ACTIVE") throw new Error("User not active");
+
+    let otpDoc = null;
+    if (user.require2FAForTransfers) {
+      if (!otpId || !otpCode) throw new Error("OTP required for transfer");
+      if (!idempotencyKey) throw new Error("idempotencyKey required");
+
+      otpDoc = await OtpToken.findById(otpId);
+      if (!otpDoc) throw new Error("Invalid OTP");
+      if (String(otpDoc.user) !== String(req.user.id)) throw new Error("Invalid OTP");
+      if (otpDoc.purpose !== "TRANSFER") throw new Error("Invalid OTP");
+      if (otpDoc.consumedAt) throw new Error("OTP already used");
+      if (otpDoc.expiresAt < new Date()) throw new Error("OTP expired");
+      if (otpDoc.code !== String(otpCode)) throw new Error("Incorrect OTP");
+      if (otpDoc.idempotencyKey && otpDoc.idempotencyKey !== idempotencyKey) {
+        throw new Error("OTP does not match transfer");
+      }
+    }
+
+    const from = await Account.findOne({ _id: fromAccountId, user: req.user.id });
+    const to = await Account.findOne({ accountNumber: toAccountNumber });
 
     if (!from || !to) throw new Error('Account not found');
     if (from.status !== 'ACTIVE' || to.status !== 'ACTIVE') throw new Error('Account blocked');
-    if (from.balance < amount) throw new Error('Insufficient funds');
+    if (from.balance < amt) throw new Error('Insufficient funds');
 
-    from.balance -= amount;
-    to.balance += amount;
+    from.balance -= amt;
+    to.balance += amt;
 
-    await from.save({ session });
-    await to.save({ session });
+    await from.save();
+    await to.save();
 
-    const tx = await Transaction.create([{
+    const tx = await Transaction.create({
       fromAccount: from._id,
       toAccount: to._id,
-      amount,
+      amount: amt,
       type: 'TRANSFER',
       status: 'SUCCESS',
       initiatedBy: req.user.id,
       idempotencyKey
-    }], { session });
+    });
 
-    await session.commitTransaction();
+    if (otpDoc) {
+      otpDoc.consumedAt = new Date();
+      await otpDoc.save();
+    }
     return res.status(201).json({ message: 'Transfer success', tx });
   } catch (e) {
-    await session.abortTransaction();
     return res.status(400).json({ error: e.message });
-  } finally {
-    session.endSession();
   }
 }
 
