@@ -30,7 +30,7 @@ if (missingEnv.length) {
 
 const app = express();
 
-
+app.set("trust proxy", 1);
 // Security + parsers
 app.use(helmet());
 app.use(hpp());
