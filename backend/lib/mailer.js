@@ -6,19 +6,17 @@ function normalizeSmtpPass(pass) {
 }
 
 function createMailerFromEnv() {
-  const smtpPort = Number(process.env.SMTP_PORT || 587);
+ 
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = normalizeSmtpPass(process.env.SMTP_PASS);
-  const smtpHost = process.env.SMTP_HOST;
+  
 
-  if (!smtpHost || !smtpUser || !smtpPass) {
+  if ( !smtpUser || !smtpPass) {
     throw new Error("SMTP is not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS)");
   }
 
   return nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpPort === 465,
+    service: "gmail",
     auth: { user: smtpUser, pass: smtpPass },
   });
 }
