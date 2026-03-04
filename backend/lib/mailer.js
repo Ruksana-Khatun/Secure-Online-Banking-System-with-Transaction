@@ -6,18 +6,19 @@ function normalizeSmtpPass(pass) {
 }
 
 function createMailerFromEnv() {
- 
   const smtpUser = process.env.SMTP_USER;
-  const smtpPass = normalizeSmtpPass(process.env.SMTP_PASS);
-  
+  const smtpPass = process.env.SMTP_PASS?.replace(/\s+/g, "");
 
-  if ( !smtpUser || !smtpPass) {
-    throw new Error("SMTP is not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS)");
+  if (!smtpUser || !smtpPass) {
+    throw new Error("SMTP not configured (set SMTP_USER, SMTP_PASS)");
   }
 
   return nodemailer.createTransport({
     service: "gmail",
-    auth: { user: smtpUser, pass: smtpPass },
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
   });
 }
 
