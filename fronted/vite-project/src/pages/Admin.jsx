@@ -176,9 +176,10 @@ export default function Admin() {
             </button>
           </form>
 
-          <table className="table">
-            <thead>
-              <tr>
+          <div className="table-responsive">
+            <table className="table">
+              <thead>
+                <tr>
                 <th>Name</th>
                 <th>Email</th>
                 <th>Role</th>
@@ -208,13 +209,17 @@ export default function Admin() {
               ))}
               {users.items.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="muted">
-                    No users found.
+                  <td colSpan={5}>
+                    <div className="empty-state" style={{ marginTop: 0, border: "none", background: "transparent" }}>
+                      <div className="empty-state-icon">👥</div>
+                      <p>No users found.</p>
+                    </div>
                   </td>
                 </tr>
               )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
 
@@ -237,9 +242,10 @@ export default function Admin() {
             </button>
           </form>
 
-          <table className="table">
-            <thead>
-              <tr>
+          <div className="table-responsive">
+            <table className="table">
+              <thead>
+                <tr>
                 <th>Date</th>
                 <th>From</th>
                 <th>To</th>
@@ -263,13 +269,17 @@ export default function Admin() {
               ))}
               {tx.items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="muted">
-                    No transactions found.
+                  <td colSpan={6}>
+                    <div className="empty-state" style={{ marginTop: 0, border: "none", background: "transparent" }}>
+                      <div className="empty-state-icon">💸</div>
+                      <p>No transactions found.</p>
+                    </div>
                   </td>
                 </tr>
               )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
 
@@ -292,9 +302,10 @@ export default function Admin() {
             </button>
           </form>
 
-          <table className="table">
-            <thead>
-              <tr>
+          <div className="table-responsive">
+            <table className="table">
+              <thead>
+                <tr>
                 <th>Date</th>
                 <th>Action</th>
                 <th>Actor</th>
@@ -314,13 +325,17 @@ export default function Admin() {
               ))}
               {logs.items.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="muted">
-                    No logs found.
+                  <td colSpan={5}>
+                    <div className="empty-state" style={{ marginTop: 0, border: "none", background: "transparent" }}>
+                      <div className="empty-state-icon">📋</div>
+                      <p>No logs found.</p>
+                    </div>
                   </td>
                 </tr>
               )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
 

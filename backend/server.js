@@ -1,6 +1,7 @@
+import "dotenv/config";
+
 import express from 'express';
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -16,8 +17,7 @@ import transactionRoutes from './routes/transaction.routes.js';
 import otpRoutes from "./routes/otp.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import legacyRoutes from "./routes/legacy.routes.js";
-
-dotenv.config();
+import bbpsRoutes from "./routes/bbps.routes.js";
 
 const requiredEnv = ["MONGO_URI", "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"];
 const missingEnv = requiredEnv.filter((k) => !process.env[k]);
@@ -63,6 +63,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/transactions', transactionRoutes)
 app.use("/api/otp", otpRoutes);
+app.use("/api/bbps", bbpsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/", legacyRoutes);
 

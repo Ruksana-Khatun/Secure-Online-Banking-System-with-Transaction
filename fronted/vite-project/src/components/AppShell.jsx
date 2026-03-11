@@ -19,6 +19,9 @@ export function AppShell() {
                 <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/dashboard">
                   Dashboard
                 </NavLink>
+                <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/bbps">
+                  Pay Bills
+                </NavLink>
                 {role === "ADMIN" && (
                   <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/admin">
                     Admin

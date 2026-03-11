@@ -6,6 +6,7 @@ import { RequireAuth } from "./auth/RequireAuth";
 import { useAuth } from "./auth/useAuth";
 import { AppShell } from "./components/AppShell";
 import Admin from "./pages/Admin";
+import BBPS from "./pages/BBPS";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -29,6 +30,14 @@ export default function App() {
           element={
             <RequireAuth>
               <Dashboard />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/bbps"
+          element={
+            <RequireAuth>
+              <BBPS />
             </RequireAuth>
           }
         />

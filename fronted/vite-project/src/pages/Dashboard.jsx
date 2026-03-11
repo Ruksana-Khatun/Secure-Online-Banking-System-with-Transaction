@@ -128,6 +128,7 @@ export default function Dashboard() {
 
   const handleConfirmTransfer = async (e) => {
     e.preventDefault();
+    const form = e.currentTarget;
     resetMessages();
 
     if (!otp.otpId || !otp.draft) {
@@ -156,7 +157,8 @@ export default function Dashboard() {
       setSuccess("Transfer successful.");
       setOtp({ otpId: "", expiresAt: "", idempotencyKey: "", draft: null, code: "" });
       await refreshAll();
-      e.currentTarget.reset?.();
+      form.reset?.(); // resets the OTP form
+      document.getElementById("transfer-form")?.reset(); // resets the main transfer form
     } catch (e2) {
       setError(e2 instanceof ApiError ? e2.message : "Transfer failed");
     } finally {
@@ -185,7 +187,10 @@ export default function Dashboard() {
         </div>
 
         {accounts.length === 0 ? (
-          <p className="muted">No accounts yet.</p>
+          <div className="empty-state">
+            <div className="empty-state-icon">🏦</div>
+            <p>No accounts yet.</p>
+          </div>
         ) : (
           <div className="grid">
             {accounts.map((acc) => (
@@ -206,10 +211,13 @@ export default function Dashboard() {
         <h3>Transfer money (OTP protected)</h3>
 
         {!hasAccounts ? (
-          <p className="muted">Create an account first to make transfers.</p>
+          <div className="empty-state">
+            <div className="empty-state-icon">💳</div>
+            <p>Create an account first to make transfers.</p>
+          </div>
         ) : (
           <>
-            <form className="form inline" onSubmit={handleSendOtpForTransfer}>
+            <form id="transfer-form" className="form inline" onSubmit={handleSendOtpForTransfer}>
               <label>
                 <span>From account</span>
                 <select name="fromAccountId" required disabled={Boolean(otp.otpId)}>
@@ -284,11 +292,15 @@ export default function Dashboard() {
         <h3>Recent transactions</h3>
 
         {history.length === 0 ? (
-          <p className="muted">No transactions yet.</p>
+          <div className="empty-state">
+            <div className="empty-state-icon">📄</div>
+            <p>No transactions yet.</p>
+          </div>
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
+          <div className="table-responsive">
+            <table className="table">
+              <thead>
+                <tr>
                 <th>Date</th>
                 <th>From</th>
                 <th>To</th>
@@ -306,8 +318,9 @@ export default function Dashboard() {
                   <td>{tx.status}</td>
                 </tr>
               ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
@@ -316,11 +329,15 @@ export default function Dashboard() {
           <h3>All user transactions (admin)</h3>
 
           {allTx.length === 0 ? (
-            <p className="muted">No transactions found.</p>
+            <div className="empty-state">
+              <div className="empty-state-icon">📇</div>
+              <p>No transactions found.</p>
+            </div>
           ) : (
-            <table className="table">
-              <thead>
-                <tr>
+            <div className="table-responsive">
+              <table className="table">
+                <thead>
+                  <tr>
                   <th>Date</th>
                   <th>From</th>
                   <th>To</th>
@@ -342,13 +359,19 @@ export default function Dashboard() {
                     <td>{tx.status}</td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       )}
 
-      {loading && <div className="muted">Loading...</div>}
+      {loading && (
+        <div className="loading-container">
+          <div className="loader" />
+          <span>Loading...</span>
+        </div>
+      )}
       {error && <div className="alert error">{error}</div>}
       {success && <div className="alert success">{success}</div>}
     </div>
