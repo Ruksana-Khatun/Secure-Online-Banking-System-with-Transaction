@@ -2,13 +2,6 @@ import { useCallback, useMemo, useState } from "react";
 import { ApiError } from "../api/request";
 import { useAuth } from "../auth/useAuth";
 
-function safeJson(value) {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
 
 export default function PPI() {
   const { authedRequest } = useAuth();
