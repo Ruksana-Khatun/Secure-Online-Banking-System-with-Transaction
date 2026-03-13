@@ -22,6 +22,9 @@ export function AppShell() {
                 <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/bbps">
                   Pay Bills
                 </NavLink>
+                <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/ppi">
+                  PPI – DigiKhata
+                </NavLink>
                 {role === "ADMIN" && (
                   <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/admin">
                     Admin

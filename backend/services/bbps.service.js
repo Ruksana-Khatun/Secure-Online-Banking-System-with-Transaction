@@ -29,6 +29,18 @@ async function withRetries(fn, { retries = MAX_RETRIES } = {}) {
       return await fn();
     } catch (err) {
       attempt += 1;
+      
+      // Log exactly what eko is complaining about if it's a 4xx issue.
+      if (err.response && err.response.status >= 400 && err.response.status < 500) {
+         console.error(`EKO API Error (${err.response.status}):`, err.response.data);
+         console.error(`EKO Request Details:`, {
+           url: err.config?.url,
+           method: err.config?.method,
+           headers: err.config?.headers,
+           data: err.config?.data
+         });
+      }
+
       if (attempt > retries || !isRetryableError(err)) throw err;
       // Exponential backoff with small jitter
       const backoff = Math.min(250 * 2 ** (attempt - 1), 2000) + Math.floor(Math.random() * 100);
@@ -58,9 +70,8 @@ export function getAuthHeaders() {
   const developerKey = requiredEnv("EKO_DEVELOPER_KEY");
   const authKey = requiredEnv("EKO_AUTH_KEY"); // ← AUTH_KEY
   const timestamp = Date.now().toString();
-  const encodedKey = Buffer.from(authKey).toString("base64"); // ← AUTH_KEY
   const secretKey = crypto
-    .createHmac("sha256", encodedKey)
+    .createHmac("sha256", Buffer.from(authKey)) // Use raw buffer
     .update(timestamp)
     .digest("base64");
 
@@ -81,11 +92,10 @@ function getFormHeaders() {
 }
 
 function getRequestHash({ secretKeyTimestamp, utilityAccNo, amount, userCode }) {
-  const authKey = requiredEnv("EKO_AUTH_KEY"); // ← AUTH_KEY
-  const encodedKey = Buffer.from(authKey).toString("base64"); // ← AUTH_KEY
+  const authKey = requiredEnv("EKO_AUTH_KEY");
   const concatenated = `${secretKeyTimestamp}${utilityAccNo}${amount}${userCode}`;
   return crypto
-    .createHmac("sha256", encodedKey)
+    .createHmac("sha256", Buffer.from(authKey)) // Use raw buffer
     .update(concatenated)
     .digest("base64");
 }

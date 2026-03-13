@@ -4,7 +4,7 @@ import { activate, categories, getBill, operators, payment } from "../controller
 
 const router = Router();
 
-router.put("/activate", activate);
+// router.put("/activate", activate);
 
 router.use(requireAuth);
 router.get("/categories", categories);
@@ -13,4 +13,3 @@ router.post("/fetch-bill", getBill);
 router.post("/pay", payment);
 
 export default router;
-

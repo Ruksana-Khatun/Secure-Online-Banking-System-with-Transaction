@@ -9,6 +9,7 @@ import Admin from "./pages/Admin";
 import BBPS from "./pages/BBPS";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+import PPI from "./pages/PPI";
 import Register from "./pages/Register";
 
 function HomeRedirect() {
@@ -38,6 +39,14 @@ export default function App() {
           element={
             <RequireAuth>
               <BBPS />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/ppi"
+          element={
+            <RequireAuth>
+              <PPI />
             </RequireAuth>
           }
         />

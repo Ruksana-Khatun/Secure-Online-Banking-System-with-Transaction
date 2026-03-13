@@ -546,3 +546,43 @@ a {
   padding: 2rem;
   color: #94a3b8;
 }
+
+/* Info Cards - replaces raw JSON pre blocks */
+.info-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(129, 140, 248, 0.25);
+  border-radius: 0.9rem;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 0.82rem;
+  color: #94a3b8;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.info-value {
+  font-size: 0.88rem;
+  color: #e2e8f0;
+  font-weight: 500;
+  text-align: right;
+  word-break: break-all;
+}

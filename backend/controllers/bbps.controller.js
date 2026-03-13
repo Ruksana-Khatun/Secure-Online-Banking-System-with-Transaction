@@ -124,6 +124,14 @@ function sendError(res, e) {
   }
 
   const upstreamStatus = e?.response?.status;
+  
+  if (e.response) {
+    console.error("--- BBPS EKO ERROR DEBUG ---");
+    console.error("Status:", e.response.status);
+    console.error("Body:", JSON.stringify(e.response.data, null, 2));
+    console.error("-----------------------------");
+  }
+
   return res.status(status).json({
     success: false,
     message: errorMessage,

@@ -18,6 +18,7 @@ import otpRoutes from "./routes/otp.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import legacyRoutes from "./routes/legacy.routes.js";
 import bbpsRoutes from "./routes/bbps.routes.js";
+import digikhataPpiRoutes from "./routes/digikhataPpi.routes.js";
 
 const requiredEnv = ["MONGO_URI", "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"];
 const missingEnv = requiredEnv.filter((k) => !process.env[k]);
@@ -64,6 +65,7 @@ app.use('/api/accounts', accountRoutes);
 app.use('/api/transactions', transactionRoutes)
 app.use("/api/otp", otpRoutes);
 app.use("/api/bbps", bbpsRoutes);
+app.use("/api/ppi", digikhataPpiRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/", legacyRoutes);
 

@@ -208,7 +208,7 @@ export default function Dashboard() {
       </section>
 
       <section className="section">
-        <h3>Transfer money (OTP protected)</h3>
+        <h3>Transfer money</h3>
 
         {!hasAccounts ? (
           <div className="empty-state">
@@ -301,23 +301,23 @@ export default function Dashboard() {
             <table className="table">
               <thead>
                 <tr>
-                <th>Date</th>
-                <th>From</th>
-                <th>To</th>
-                <th>Amount</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((tx) => (
-                <tr key={tx._id}>
-                  <td>{new Date(tx.createdAt).toLocaleString()}</td>
-                  <td>{tx.fromAccount?.accountNumber || tx.fromAccount}</td>
-                  <td>{tx.toAccount?.accountNumber || tx.toAccount}</td>
-                  <td>{formatMoney(Number(tx.amount), tx.currency || "INR")}</td>
-                  <td>{tx.status}</td>
+                  <th>Date</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Amount</th>
+                  <th>Status</th>
                 </tr>
-              ))}
+              </thead>
+              <tbody>
+                {history.map((tx) => (
+                  <tr key={tx._id}>
+                    <td>{new Date(tx.createdAt).toLocaleString()}</td>
+                    <td>{tx.fromAccount?.accountNumber || tx.fromAccount}</td>
+                    <td>{tx.toAccount?.accountNumber || tx.toAccount}</td>
+                    <td>{formatMoney(Number(tx.amount), tx.currency || "INR")}</td>
+                    <td>{tx.status}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -338,27 +338,27 @@ export default function Dashboard() {
               <table className="table">
                 <thead>
                   <tr>
-                  <th>Date</th>
-                  <th>From</th>
-                  <th>To</th>
-                  <th>Amount</th>
-                  <th>Initiated by</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allTx.map((tx) => (
-                  <tr key={tx._id}>
-                    <td>{new Date(tx.createdAt).toLocaleString()}</td>
-                    <td>{tx.fromAccount?.accountNumber || "-"}</td>
-                    <td>{tx.toAccount?.accountNumber || "-"}</td>
-                    <td>
-                      {formatMoney(Number(tx.amount), tx.currency || "INR")}
-                    </td>
-                    <td>{tx.initiatedBy?.email || "-"}</td>
-                    <td>{tx.status}</td>
+                    <th>Date</th>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Amount</th>
+                    <th>Initiated by</th>
+                    <th>Status</th>
                   </tr>
-                ))}
+                </thead>
+                <tbody>
+                  {allTx.map((tx) => (
+                    <tr key={tx._id}>
+                      <td>{new Date(tx.createdAt).toLocaleString()}</td>
+                      <td>{tx.fromAccount?.accountNumber || "-"}</td>
+                      <td>{tx.toAccount?.accountNumber || "-"}</td>
+                      <td>
+                        {formatMoney(Number(tx.amount), tx.currency || "INR")}
+                      </td>
+                      <td>{tx.initiatedBy?.email || "-"}</td>
+                      <td>{tx.status}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

@@ -30,6 +30,8 @@ export default function BBPS() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [success, setSuccess] = useState("");
 
+  const [activeTab, setActiveTab] = useState("BBPS"); // "BBPS" | "PPI"
+
   const [categories, setCategories] = useState([]);
   const [operators, setOperators] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
@@ -37,6 +39,8 @@ export default function BBPS() {
 
   const [billResult, setBillResult] = useState(null);
   const [payResult, setPayResult] = useState(null);
+
+  const [ppiResult, setPpiResult] = useState(null);
 
   const [form, setForm] = useState({
     utilityAccNo: "",
@@ -75,6 +79,7 @@ export default function BBPS() {
     setError("");
     setFieldErrors({});
     setSuccess("");
+    setPpiResult(null);
   }, []);
 
   const loadCategories = useCallback(async () => {
@@ -87,7 +92,7 @@ export default function BBPS() {
         setCategories(arr);
         return;
       }
-    } catch (_) {
+    } catch {
       /* use fallback */
     }
     // Eko API failed or returned empty - use fallback so UI works for demo
@@ -110,7 +115,7 @@ export default function BBPS() {
           setOperators(arr);
           return;
         }
-      } catch (_) {
+      } catch {
         /* use fallback */
       }
       const fallback = FALLBACK_OPERATORS_BY_CATEGORY[Number(categoryId)] ?? [];
@@ -151,6 +156,51 @@ export default function BBPS() {
       })
       .finally(() => setLoading(false));
   }, [selectedCategoryId, loadOperators]);
+
+  const handlePpiSubmit = async (e) => {
+    e.preventDefault();
+    resetMessages();
+    setLoading(true);
+    try {
+      const senderMobile = String(form.customerMobile || "").trim();
+      const recipientAccount = String(form.utilityAccNo || "").trim();
+      const amount = Number(form.amount);
+
+      if (!senderMobile || !recipientAccount) {
+        setError("Enter sender mobile and recipient account.");
+        return;
+      }
+      if (!Number.isFinite(amount) || amount <= 0) {
+        setError("Enter a valid amount.");
+        return;
+      }
+
+      const res = await authedRequest("/api/ppi/transactions", {
+        method: "POST",
+        body: {
+          senderMobile,
+          recipientAccount,
+          amount,
+          description: form.senderName || undefined,
+        },
+      });
+
+      if (!res?.success) {
+        throw new ApiError(res?.message || "PPI transaction failed", res);
+      }
+
+      setPpiResult(res.data);
+      setSuccess("PPI transaction initiated.");
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setError(e.message);
+      } else {
+        setError("PPI transaction failed");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFetchBill = async (e) => {
     e.preventDefault();
@@ -251,78 +301,205 @@ export default function BBPS() {
   return (
     <div className="dashboard">
       <div className="tabs">
-        <button className="tab active" type="button">
+        <button
+          className={`tab ${activeTab === "BBPS" ? "active" : ""}`}
+          type="button"
+          onClick={() => {
+            setActiveTab("BBPS");
+            resetMessages();
+          }}
+        >
           Pay Bills (BBPS)
+        </button>
+        <button
+          className={`tab ${activeTab === "PPI" ? "active" : ""}`}
+          type="button"
+          onClick={() => {
+            setActiveTab("PPI");
+            resetMessages();
+          }}
+        >
+          PPI – DigiKhata
         </button>
       </div>
 
-      <section className="section">
-        <h3>Bill payment</h3>
-        <p className="muted">
-          Pay electricity, gas, water, DTH, mobile recharge and more. Select category and operator, then fetch bill or pay.
-        </p>
+      {activeTab === "BBPS" && (
+        <>
+          <section className="section">
+            <h3>Bill payment</h3>
+            <p className="muted">
+              Pay electricity, gas, water, DTH, mobile recharge and more. Select category and operator, then fetch bill
+              or pay.
+            </p>
 
-        <div className="form inline" style={{ marginTop: "1rem" }}>
-          <label>
-            <span>Category</span>
-            <select
-              value={selectedCategoryId}
-              onChange={(e) => {
-                setSelectedCategoryId(e.target.value);
-                setSelectedOperator(null);
-                setBillResult(null);
-                setPayResult(null);
-              }}
-              disabled={loading}
-            >
-              <option value="">Select category</option>
-              {categories.map((c) => (
-                <option key={c.operator_category_id} value={c.operator_category_id}>
-                  {c.operator_category_name}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div className="form inline" style={{ marginTop: "1rem" }}>
+              <label>
+                <span>Category</span>
+                <select
+                  value={selectedCategoryId}
+                  onChange={(e) => {
+                    setSelectedCategoryId(e.target.value);
+                    setSelectedOperator(null);
+                    setBillResult(null);
+                    setPayResult(null);
+                  }}
+                  disabled={loading}
+                >
+                  <option value="">Select category</option>
+                  {categories.map((c) => (
+                    <option key={c.operator_category_id} value={c.operator_category_id}>
+                      {c.operator_category_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-          <label>
-            <span>Operator</span>
-            <select
-              value={selectedOperator ? selectedOperator.operator_id : ""}
-              onChange={(e) => {
-                const id = e.target.value;
-                const op = operators.find((o) => String(o.operator_id) === id) || null;
-                setSelectedOperator(op);
-                setBillResult(null);
-                setPayResult(null);
-              }}
-              disabled={loading || !selectedCategoryId}
-            >
-              <option value="">Select operator</option>
-              {operators.map((o) => (
-                <option key={o.operator_id} value={o.operator_id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </section>
+              <label>
+                <span>Operator</span>
+                <select
+                  value={selectedOperator ? selectedOperator.operator_id : ""}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    const op = operators.find((o) => String(o.operator_id) === id) || null;
+                    setSelectedOperator(op);
+                    setBillResult(null);
+                    setPayResult(null);
+                  }}
+                  disabled={loading || !selectedCategoryId}
+                >
+                  <option value="">Select operator</option>
+                  {operators.map((o) => (
+                    <option key={o.operator_id} value={o.operator_id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
 
-      {selectedOperator && (
+          {selectedOperator && (
+            <section className="section">
+              <h3>Bill details</h3>
+              <form className="form inline" onSubmit={handleFetchBill}>
+                <label>
+                  <span>Utility / Account number</span>
+                  <input
+                    value={form.utilityAccNo}
+                    onChange={(e) => setForm((f) => ({ ...f, utilityAccNo: e.target.value }))}
+                    placeholder="Account or consumer number"
+                    disabled={loading}
+                  />
+                </label>
+                <label>
+                  <span>Customer mobile</span>
+                  <input
+                    value={form.customerMobile}
+                    onChange={(e) => setForm((f) => ({ ...f, customerMobile: e.target.value }))}
+                    placeholder="10-digit mobile"
+                    maxLength={10}
+                    disabled={loading}
+                  />
+                </label>
+                <label>
+                  <span>Sender name (optional)</span>
+                  <input
+                    value={form.senderName}
+                    onChange={(e) => setForm((f) => ({ ...f, senderName: e.target.value }))}
+                    placeholder="Your name"
+                    disabled={loading}
+                  />
+                </label>
+                <button className="btn primary" type="submit" disabled={loading}>
+                  {loading ? "Fetching..." : "Fetch bill"}
+                </button>
+              </form>
+
+              {billResult && (
+                <div className="bbps-panel">
+                  <div className="bbps-panel-header">
+                    <span className="bbps-panel-label">Bill fetched</span>
+                    <span className="bbps-panel-tag">Preview</span>
+                  </div>
+                  <div className="bbps-panel-body">
+                    {(() => {
+                      const raw = billResult.data?.data ?? billResult.data ?? billResult;
+                      const cleaned = sanitizePreview(raw);
+                      if (!cleaned) {
+                        return (
+                          <div className="muted">
+                            No bill details returned from provider. Please verify inputs and try again.
+                          </div>
+                        );
+                      }
+                      return <pre className="bbps-code">{JSON.stringify(cleaned, null, 2)}</pre>;
+                    })()}
+                    {billResult.data?.data?.amount && (
+                      <div className="bbps-kv">
+                        <span>Due amount: ₹{billResult.data.data.amount}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {selectedOperator && (
+            <section className="section">
+              <h3>Pay bill</h3>
+              <form className="form inline" onSubmit={handlePayBill}>
+                <label>
+                  <span>Amount (₹)</span>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={form.amount}
+                    onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                    placeholder="Amount"
+                    required
+                    disabled={loading}
+                  />
+                </label>
+                <button className="btn primary" type="submit" disabled={loading}>
+                  {loading ? "Processing..." : "Pay bill"}
+                </button>
+              </form>
+              <p className="muted">
+                Use the same utility account and mobile as above. Fetch bill first to see due amount.
+              </p>
+
+              {payResult && (
+                <div className="bbps-panel">
+                  <div className="bbps-panel-header">
+                    <span className="bbps-panel-label">Payment result</span>
+                    <span className="bbps-panel-tag">{payResult.transaction?.status ?? "—"}</span>
+                  </div>
+                  <div className="bbps-panel-body">
+                    <div className="bbps-kv">
+                      <span>Transaction ID: {payResult.transaction?._id ?? "—"}</span>
+                      {typeof payResult.eko === "object" && <span>Gateway: Eko</span>}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+        </>
+      )}
+
+      {activeTab === "PPI" && (
         <section className="section">
-          <h3>Bill details</h3>
-          <form className="form inline" onSubmit={handleFetchBill}>
+          <h3>PPI – DigiKhata transaction</h3>
+          <p className="muted">
+            Initiate a prepaid payment instrument (PPI) transaction via DigiKhata. Use sender mobile, recipient account
+            and amount.
+          </p>
+
+          <form className="form inline" onSubmit={handlePpiSubmit}>
             <label>
-              <span>Utility / Account number</span>
-              <input
-                value={form.utilityAccNo}
-                onChange={(e) => setForm((f) => ({ ...f, utilityAccNo: e.target.value }))}
-                placeholder="Account or consumer number"
-                disabled={loading}
-              />
-            </label>
-            <label>
-              <span>Customer mobile</span>
+              <span>Sender mobile</span>
               <input
                 value={form.customerMobile}
                 onChange={(e) => setForm((f) => ({ ...f, customerMobile: e.target.value }))}
@@ -332,55 +509,14 @@ export default function BBPS() {
               />
             </label>
             <label>
-              <span>Sender name (optional)</span>
+              <span>Recipient account / wallet ID</span>
               <input
-                value={form.senderName}
-                onChange={(e) => setForm((f) => ({ ...f, senderName: e.target.value }))}
-                placeholder="Your name"
+                value={form.utilityAccNo}
+                onChange={(e) => setForm((f) => ({ ...f, utilityAccNo: e.target.value }))}
+                placeholder="Account or wallet identifier"
                 disabled={loading}
               />
             </label>
-            <button className="btn primary" type="submit" disabled={loading}>
-              {loading ? "Fetching..." : "Fetch bill"}
-            </button>
-          </form>
-
-          {billResult && (
-            <div className="bbps-panel">
-              <div className="bbps-panel-header">
-                <span className="bbps-panel-label">Bill fetched</span>
-                <span className="bbps-panel-tag">Preview</span>
-              </div>
-              <div className="bbps-panel-body">
-                {(() => {
-                  const raw = billResult.data?.data ?? billResult.data ?? billResult;
-                  const cleaned = sanitizePreview(raw);
-                  if (!cleaned) {
-                    return (
-                      <div className="muted">
-                        No bill details returned from provider. Please verify inputs and try again.
-                      </div>
-                    );
-                  }
-                  return (
-                    <pre className="bbps-code">{JSON.stringify(cleaned, null, 2)}</pre>
-                  );
-                })()}
-                {billResult.data?.data?.amount && (
-                  <div className="bbps-kv">
-                    <span>Due amount: ₹{billResult.data.data.amount}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {selectedOperator && (
-        <section className="section">
-          <h3>Pay bill</h3>
-          <form className="form inline" onSubmit={handlePayBill}>
             <label>
               <span>Amount (₹)</span>
               <input
@@ -395,27 +531,19 @@ export default function BBPS() {
               />
             </label>
             <button className="btn primary" type="submit" disabled={loading}>
-              {loading ? "Processing..." : "Pay bill"}
+              {loading ? "Processing..." : "Initiate PPI transaction"}
             </button>
           </form>
-          <p className="muted">Use the same utility account and mobile as above. Fetch bill first to see due amount.</p>
 
-          {payResult && (
-            <div className="bbps-panel">
+          {ppiResult && (
+            <div className="bbps-panel" style={{ marginTop: "1rem" }}>
               <div className="bbps-panel-header">
-                <span className="bbps-panel-label">Payment result</span>
-                <span className="bbps-panel-tag">
-                  {payResult.transaction?.status ?? "—"}
-                </span>
+                <span className="bbps-panel-label">PPI transaction result</span>
+                <span className="bbps-panel-tag">{ppiResult.transaction?.status ?? "—"}</span>
               </div>
               <div className="bbps-panel-body">
                 <div className="bbps-kv">
-                  <span>
-                    Transaction ID: {payResult.transaction?._id ?? "—"}
-                  </span>
-                  {typeof payResult.eko === "object" && (
-                    <span>Gateway: Eko</span>
-                  )}
+                  <span>Transaction ID: {ppiResult.transaction?._id ?? "—"}</span>
                 </div>
               </div>
             </div>
