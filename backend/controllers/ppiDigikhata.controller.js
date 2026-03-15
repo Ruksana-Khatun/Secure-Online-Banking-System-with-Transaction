@@ -1,4 +1,5 @@
  import Transaction from "../models/Transaction.model.js";
+import Account from "../models/Account.model.js";
 import {
   addRecipient,
   addRecipientBank,
@@ -30,24 +31,28 @@ function mapTxStatus(providerData) {
   return "PENDING";
 }
 
-function sendError(res, e) {
-  console.error("--- API ERROR DEBUG ---");
-  console.error("Message:", e.message);
-  if (e.response) {
-    console.error("Eko Status:", e.response.status);
-    console.error("Eko Body:", JSON.stringify(e.response.data, null, 2));
-  } else {
-    console.error("No Response (Network/Local Error):", e.stack || e);
-  }
-  console.error("-----------------------");
+function normalizeEkoError(payload) {
+  const rawMessage = payload?.message || payload?.reason || "";
+  let message = rawMessage || "Transaction failed";
 
+  const lowerMessage = rawMessage.toLowerCase();
+
+  // Replace technical technical jargon with human-readable messages
+  if (lowerMessage.includes("okeykey") || lowerMessage.includes("request to bbps")) {
+    message = "Bank system is temporarily busy. Please try again after some time.";
+  } else if (lowerMessage.includes("jdbc") || lowerMessage.includes("hibernate") || lowerMessage.includes("internal error")) {
+    message = "External bank server is experiencing technical issues. Please try again later.";
+  }
+
+  return { message, raw: payload };
+}
+
+function sendError(res, e) {
   const status = e?.statusCode || e?.response?.status || 500;
-  const message = e?.message || "Request failed";
-  const details = e?.response?.data;
+  const message = e?.message || "Bank server error. Please try again.";
   return res.status(status).json({
     success: false,
     message,
-    ...(details !== undefined ? { details } : {}),
   });
 }
 
@@ -212,10 +217,22 @@ export async function txnInitiate(req, res) {
       tx.meta = { ...tx.meta, providerResponse: provider };
       await tx.save();
 
+      // ✅ Deduct balance if SUCCESS
+      if (finalStatus === "SUCCESS") {
+        const acc = await Account.findOne({ user: req.user.id, status: "ACTIVE" });
+        if (acc) {
+          acc.balance -= amt;
+          await acc.save();
+          tx.fromAccount = acc._id;
+          await tx.save();
+        }
+      }
+
       if (finalStatus === "FAILED") {
+        const norm = normalizeEkoError(provider);
         return res.status(400).json({
           success: false,
-          message: provider?.message || "Transaction failed",
+          message: norm.message,
           transaction: tx,
           provider,
         });
@@ -248,6 +265,38 @@ export async function txnInquiry(req, res) {
     const { clientRefId } = req.params;
     if (!clientRefId) throw badRequest("clientRefId is required");
     const data = await transactionInquiry({ clientRefId });
+
+    // ✅ Update local transaction status if it was PENDING
+    const tx = await Transaction.findOne({ idempotencyKey: clientRefId });
+    if (tx && tx.status === "PENDING") {
+      const newStatus = mapTxStatus(data);
+      if (newStatus !== "PENDING") {
+        tx.status = newStatus;
+        tx.meta = { ...tx.meta, inquiryResponse: data };
+        await tx.save();
+
+        if (newStatus === "SUCCESS") {
+          const amt = tx.amount;
+          const acc = await Account.findOne({ user: tx.initiatedBy, status: "ACTIVE" });
+          if (acc) {
+            acc.balance -= amt;
+            await acc.save();
+            tx.fromAccount = acc._id;
+            await tx.save();
+
+            // Special case for mock: if success upon inquiry, also deduct from mock limit
+            if (process.env.USE_PPI_MOCK === "true") {
+              const { getSenderInformation } = await import("../services/digikhataPpi.service.js");
+              const sender = await getSenderInformation({ customerId: tx.meta.customerId });
+              if (sender && typeof sender.remaining_limit === "number") {
+                sender.remaining_limit -= amt;
+              }
+            }
+          }
+        }
+      }
+    }
+
     return res.json({ success: true, data });
   } catch (e) {
     return sendError(res, e);
