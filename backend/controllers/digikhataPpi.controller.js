@@ -1,4 +1,5 @@
 import Transaction from "../models/Transaction.model.js";
+import PpiWallet from "../models/PpiWallet.model.js";
 import { createPpiTransaction } from "../services/digikhataPpi.service.js";
 
 function badRequest(message) {
@@ -21,13 +22,15 @@ function mapProviderStatus(providerData) {
   const code = providerData?.status_code ?? providerData?.code ?? providerData?.status;
   const text = String(code ?? "").toLowerCase();
 
-  if (!text) return "SUCCESS";
+  if (!text) return "PENDING";  // Default to PENDING for safety
   if (text.includes("pending")) return "PENDING";
   if (text.includes("fail") || text.includes("error")) return "FAILED";
+  if (text.includes("success")) return "SUCCESS";
 
   // Some providers use numeric codes like "00" for success.
   if (text === "00" || text === "success") return "SUCCESS";
-  return "SUCCESS";
+  
+  return "PENDING";  // Safer default
 }
 
 export async function initiatePpiTransaction(req, res) {
@@ -39,6 +42,20 @@ export async function initiatePpiTransaction(req, res) {
 
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt <= 0) throw badRequest("amount must be a positive number");
+
+    // Check PPI wallet balance before transaction
+    const ppiWallet = await PpiWallet.findOne({ 
+      user: req.user.id, 
+      status: "ACTIVE" 
+    });
+    
+    if (!ppiWallet) {
+      throw badRequest("PPI wallet not found. Please complete sender onboarding first.");
+    }
+    
+    if (!ppiWallet.canTransact(amt)) {
+      throw badRequest(`Insufficient wallet balance. Available: ₹${ppiWallet.remainingLimit}`);
+    }
 
     const clientRefId = `PPI_${Date.now()}`;
 
@@ -54,6 +71,7 @@ export async function initiatePpiTransaction(req, res) {
         recipientAccount,
         description,
         clientRefId,
+        ppiWalletId: ppiWallet._id,
       },
     });
 
@@ -74,6 +92,16 @@ export async function initiatePpiTransaction(req, res) {
       };
       await tx.save();
 
+      // Deduct from PPI wallet if successful
+      if (finalStatus === "SUCCESS") {
+        try {
+          await ppiWallet.deductBalance(amt);
+        } catch (balanceError) {
+          console.error("Balance deduction failed:", balanceError);
+          // Transaction succeeded but balance deduction failed - log for manual reconciliation
+        }
+      }
+
       if (finalStatus === "FAILED") {
         return res.status(400).json({
           success: false,
@@ -87,6 +115,10 @@ export async function initiatePpiTransaction(req, res) {
         data: {
           transaction: tx,
           provider: providerData,
+          walletInfo: {
+            remainingLimit: ppiWallet.remainingLimit,
+            monthlyLimit: ppiWallet.monthlyLimit
+          }
         },
       });
     } catch (err) {

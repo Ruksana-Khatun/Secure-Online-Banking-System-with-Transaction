@@ -7,6 +7,8 @@ const email = process.env.ADMIN_EMAIL;
 const password = process.env.ADMIN_PASSWORD;
 const fullName = process.env.ADMIN_FULLNAME || "Admin";
 
+console.log("Environment variables:", { email: !!email, password: !!password, fullName });
+
 if (!process.env.MONGO_URI) {
   console.error("Missing MONGO_URI in backend/.env");
   process.exit(1);

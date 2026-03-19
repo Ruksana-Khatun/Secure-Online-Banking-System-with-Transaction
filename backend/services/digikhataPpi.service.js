@@ -75,10 +75,14 @@ export async function getSenderInformation({ customerId }) {
   return res.data;
 }
 
-export async function onboardSender({ customerId, name, dob, residence_address, extra = {} }) {
+export async function onboardSender({ customerId, name, mobile, dob, residence_address, extra = {} }) {
+  console.log(`[PPI Service] Onboarding sender: ${customerId}, name: ${name}, mobile: ${mobile}`);
+  
   if (isMockEnabled()) {
     const sender = ensureMockSender(customerId);
     sender.name = name || sender.name;
+    sender.mobile = mobile || sender.mobile;
+    console.log(`[PPI Service] Mock sender onboarded: ${customerId}`);
     return { ...sender, message: "Mock sender onboarded" };
   }
 
@@ -86,16 +90,21 @@ export async function onboardSender({ customerId, name, dob, residence_address, 
   const body = {
     initiator_id: process.env.EKO_INITIATOR_ID,
     name,
+    mobile,
     dob,
     residence_address,
     ...extra,
   };
+  
+  console.log(`[PPI Service] Sending onboarding request to EKO for: ${customerId}`);
   const res = await axios.post(url, body, {
     headers: getAuthHeaders(),
     params: getCommonParams(),
     timeout: 20000,
     httpsAgent,
   });
+  
+  console.log(`[PPI Service] Onboarding response for ${customerId}:`, res.data);
   return res.data;
 }
 
@@ -230,6 +239,8 @@ export async function addRecipientBank({ customerId, recipientId, accountNumber,
 // ═════════════════════════════════════════════
 
 export async function sendTransactionOtp({ customerId, amount, extra = {} }) {
+  console.log(`[PPI Service] Sending OTP for transaction: ${customerId}, amount: ${amount}`);
+  
   if (isMockEnabled()) {
     return {
       customer_id: String(customerId),
@@ -243,24 +254,33 @@ export async function sendTransactionOtp({ customerId, amount, extra = {} }) {
     `/v3/customer/account/${encodeURIComponent(customerId)}/ppi-digikhata/transaction/otp`
   );
   const body = { initiator_id: process.env.EKO_INITIATOR_ID, amount, ...extra };
+  
+  console.log(`[PPI Service] Sending OTP request to EKO for: ${customerId}`);
   const res = await axios.post(url, body, {
     headers: getAuthHeaders(),
     params: getCommonParams(),
     timeout: 20000,
     httpsAgent,
   });
+  
+  console.log(`[PPI Service] OTP response for ${customerId}:`, res.data);
   return res.data;
 }
 
 export async function initiateTransaction({
   customerId, recipientId, amount, otp, otpRefId, clientRefId, extra = {},
 }) {
+  console.log(`[PPI Service] Initiating transaction: ${customerId} -> ${recipientId}, amount: ${amount}`);
+  
   if (isMockEnabled()) {
     const sender = ensureMockSender(customerId);
     const txStatus = amount > 1000000 ? 2 : 0; // 2 = Initiated (Pending), 0 = Success
     
     if (txStatus === 0) {
       sender.remaining_limit -= amount;
+      console.log(`[PPI Service] Mock transaction successful: ${customerId}, new balance: ${sender.remaining_limit}`);
+    } else {
+      console.log(`[PPI Service] Mock transaction pending: ${customerId}, amount: ${amount}`);
     }
 
     return {
@@ -284,12 +304,16 @@ export async function initiateTransaction({
     client_ref_id: clientRefId,
     ...extra,
   };
+  
+  console.log(`[PPI Service] Sending transaction request to EKO for: ${customerId}`);
   const res = await axios.post(url, body, {
     headers: getAuthHeaders(),
     params: getCommonParams(),
     timeout: 20000,
     httpsAgent,
   });
+  
+  console.log(`[PPI Service] Transaction response for ${customerId}:`, res.data);
   return res.data;
 }
 

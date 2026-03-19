@@ -380,13 +380,13 @@ export default function PPI() {
 
       <section className="section">
         <h3>PPI – DigiKhata</h3>
-        <p className="muted">
+        {/* <p className="muted">
           This page calls your backend PPI APIs. If `USE_PPI_MOCK=true`, OTP is `123456` and no external API is called.
-        </p>
+        </p> */}
 
         <div className="form inline" style={{ marginTop: "0.75rem" }}>
           <label>
-            <span>Sender Mobile Number <span className="muted" style={{fontSize:"0.78rem"}}>(Customer ID)</span></span>
+            <span>Sender Mobile Number <span className="muted" style={{ fontSize: "0.78rem" }}>(Customer ID)</span></span>
             <input
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}

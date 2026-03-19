@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "../api/request";
 import { useAuth } from "../auth/useAuth";
 
+
 const DEFAULT_LATLONG = "25.309580,83.005692";
 
-// Fallback when Eko API is unavailable (wrong credentials / 500)
 const FALLBACK_CATEGORIES = [
   { operator_category_id: 2, operator_category_name: "Gas" },
   { operator_category_id: 4, operator_category_name: "DTH" },
@@ -30,7 +30,7 @@ export default function BBPS() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [success, setSuccess] = useState("");
 
-  const [activeTab, setActiveTab] = useState("BBPS"); // "BBPS" | "PPI"
+  const [activeTab, setActiveTab] = useState("BBPS");
 
   const [categories, setCategories] = useState([]);
   const [operators, setOperators] = useState([]);
@@ -39,16 +39,33 @@ export default function BBPS() {
 
   const [billResult, setBillResult] = useState(null);
   const [payResult, setPayResult] = useState(null);
-
   const [ppiResult, setPpiResult] = useState(null);
 
-  const [form, setForm] = useState({
+  // Categories that require amount upfront (Recharges)
+  const RECHARGE_CATEGORIES = [
+    5, // Mobile Prepaid
+    4, // DTH
+    21, // FASTag
+    34, // Google Play / Subscription
+  ];
+
+  const isRechargeCategory = (id) => RECHARGE_CATEGORIES.includes(Number(id));
+
+  const [bbpsForm, setBbpsForm] = useState({
     utilityAccNo: "",
     customerMobile: "",
-    senderName: "",
     amount: "",
-    latlong: DEFAULT_LATLONG,
+    senderName: "",
+    latlong: "",
   });
+
+  const [ppiForm, setPpiForm] = useState({
+    senderMobile: "",
+    recipientAccount: "",
+    amount: "",
+  });
+
+  const [recipients, setRecipients] = useState([]);
 
   const sanitizePreview = useCallback((value) => {
     const dropEmpty = (v) => {
@@ -71,7 +88,6 @@ export default function BBPS() {
       }
       return v;
     };
-
     return dropEmpty(value);
   }, []);
 
@@ -95,7 +111,6 @@ export default function BBPS() {
     } catch {
       /* use fallback */
     }
-    // Eko API failed or returned empty - use fallback so UI works for demo
     setCategories(FALLBACK_CATEGORIES);
     setError("Using demo categories. Connect correct Eko credentials for live data.");
   }, [authedRequest]);
@@ -120,7 +135,8 @@ export default function BBPS() {
       }
       const fallback = FALLBACK_OPERATORS_BY_CATEGORY[Number(categoryId)] ?? [];
       setOperators(fallback);
-      if (fallback.length === 0) setError("No operators for this category. Connect correct Eko credentials for live data.");
+      if (fallback.length === 0)
+        setError("No operators for this category.");
     },
     [authedRequest]
   );
@@ -137,9 +153,7 @@ export default function BBPS() {
       .finally(() => {
         if (active) setLoading(false);
       });
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [loadCategories, resetMessages]);
 
   useEffect(() => {
@@ -162,9 +176,9 @@ export default function BBPS() {
     resetMessages();
     setLoading(true);
     try {
-      const senderMobile = String(form.customerMobile || "").trim();
-      const recipientAccount = String(form.utilityAccNo || "").trim();
-      const amount = Number(form.amount);
+      const senderMobile = String(ppiForm.senderMobile || "").trim();
+      const recipientAccount = String(ppiForm.recipientAccount || "").trim();
+      const amount = Number(ppiForm.amount);
 
       if (!senderMobile || !recipientAccount) {
         setError("Enter sender mobile and recipient account.");
@@ -181,26 +195,44 @@ export default function BBPS() {
           senderMobile,
           recipientAccount,
           amount,
-          description: form.senderName || undefined,
         },
       });
 
-      if (!res?.success) {
-        throw new ApiError(res?.message || "PPI transaction failed", res);
-      }
-
+      if (!res?.success) throw new ApiError(res?.message || "PPI transaction failed", res);
       setPpiResult(res.data);
       setSuccess("PPI transaction initiated.");
     } catch (e) {
-      if (e instanceof ApiError) {
-        setError(e.message);
-      } else {
-        setError("PPI transaction failed");
-      }
+      setError(e instanceof ApiError ? e.message : "PPI transaction failed");
     } finally {
       setLoading(false);
     }
   };
+
+  const loadRecipients = useCallback(async () => {
+    resetMessages();
+    const id = String(ppiForm.senderMobile || "").trim();
+    if (!id) {
+      setError("Enter sender mobile first.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await authedRequest(`/api/ppi/recipients/${encodeURIComponent(id)}`);
+      if (!res?.success) throw new Error(res?.message || "Failed to load recipients");
+      const list = res.data?.recipients ?? res.data?.data?.recipients ?? res.data ?? [];
+      const recipientsList = Array.isArray(list) ? list : [];
+      setRecipients(recipientsList);
+      setSuccess("Recipients loaded.");
+      // ✅ Autofill: Select first recipient automatically
+      if (recipientsList.length > 0 && !ppiForm.recipientAccount) {
+        setPpiForm((prev) => ({ ...prev, recipientAccount: recipientsList[0].recipient_id }));
+      }
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to load recipients");
+    } finally {
+      setLoading(false);
+    }
+  }, [authedRequest, ppiForm.senderMobile, resetMessages]);
 
   const handleFetchBill = async (e) => {
     e.preventDefault();
@@ -212,11 +244,23 @@ export default function BBPS() {
       setError("Select a category and operator first.");
       return;
     }
-    const utilityAccNo = String(form.utilityAccNo || "").trim();
-    const customerMobile = String(form.customerMobile || "").trim();
+
+    const utilityAccNo = String(bbpsForm.utilityAccNo || "").trim();
+    const customerMobile = String(bbpsForm.customerMobile || "").trim();
+
     if (!utilityAccNo || !customerMobile) {
       setError("Enter utility account number and customer mobile.");
       return;
+    }
+
+    // ✅ Conditional amount: Only required for Recharges (Prepaid/DTH) upfront.
+    // For Utilities (Electricity/Water), it's fetched from the server.
+    const amount = String(bbpsForm.amount || "").trim();
+    if (isRechargeCategory(selectedCategoryId)) {
+      if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+        setError("Enter a valid amount for this recharge.");
+        return;
+      }
     }
 
     setLoading(true);
@@ -227,21 +271,22 @@ export default function BBPS() {
           billerId,
           utilityAccNo,
           customerMobile,
-          senderName: form.senderName || undefined,
-          amount: form.amount || undefined,
-          latlong: form.latlong || DEFAULT_LATLONG,
+          senderName: bbpsForm.senderName || undefined,
+          amount,
+          latlong: bbpsForm.latlong || DEFAULT_LATLONG,
         },
       });
       if (!res?.success) throw new Error(res?.message || "Fetch bill failed");
       setBillResult(res.data);
       setSuccess("Bill fetched. You can pay the amount below.");
-      if (res.data?.data?.amount) setForm((f) => ({ ...f, amount: String(res.data.data.amount) }));
+      if (res.data?.data?.amount)
+        setBbpsForm((f) => ({ ...f, amount: String(res.data.data.amount) }));
     } catch (e) {
       if (e instanceof ApiError) {
         setError(e.message);
         if (e.data?.invalidParams) setFieldErrors(e.data.invalidParams);
       } else {
-        setError("Fetch bill failed");
+        setError(e.message || "Fetch bill failed");
       }
     } finally {
       setLoading(false);
@@ -258,9 +303,11 @@ export default function BBPS() {
       setError("Select a category and operator first.");
       return;
     }
-    const utilityAccNo = String(form.utilityAccNo || "").trim();
-    const customerMobile = String(form.customerMobile || "").trim();
-    const amount = Number(form.amount);
+
+    const utilityAccNo = String(bbpsForm.utilityAccNo || "").trim();
+    const customerMobile = String(bbpsForm.customerMobile || "").trim();
+    const amount = Number(bbpsForm.amount);
+
     if (!utilityAccNo || !customerMobile) {
       setError("Enter utility account number and customer mobile.");
       return;
@@ -279,8 +326,8 @@ export default function BBPS() {
           utilityAccNo,
           customerMobile,
           amount,
-          senderName: form.senderName || undefined,
-          latlong: form.latlong || DEFAULT_LATLONG,
+          senderName: bbpsForm.senderName || undefined,
+          latlong: bbpsForm.latlong || DEFAULT_LATLONG,
         },
       });
       if (!res?.success) throw new Error(res?.message || "Payment failed");
@@ -291,7 +338,7 @@ export default function BBPS() {
         setError(e.message);
         if (e.data?.invalidParams) setFieldErrors(e.data.invalidParams);
       } else {
-        setError("Payment failed");
+        setError(e.message || "Payment failed");
       }
     } finally {
       setLoading(false);
@@ -304,20 +351,14 @@ export default function BBPS() {
         <button
           className={`tab ${activeTab === "BBPS" ? "active" : ""}`}
           type="button"
-          onClick={() => {
-            setActiveTab("BBPS");
-            resetMessages();
-          }}
+          onClick={() => { setActiveTab("BBPS"); resetMessages(); }}
         >
           Pay Bills (BBPS)
         </button>
         <button
           className={`tab ${activeTab === "PPI" ? "active" : ""}`}
           type="button"
-          onClick={() => {
-            setActiveTab("PPI");
-            resetMessages();
-          }}
+          onClick={() => { setActiveTab("PPI"); resetMessages(); }}
         >
           PPI – DigiKhata
         </button>
@@ -328,8 +369,7 @@ export default function BBPS() {
           <section className="section">
             <h3>Bill payment</h3>
             <p className="muted">
-              Pay electricity, gas, water, DTH, mobile recharge and more. Select category and operator, then fetch bill
-              or pay.
+              Pay electricity, gas, water, DTH, mobile recharge and more.
             </p>
 
             <div className="form inline" style={{ marginTop: "1rem" }}>
@@ -385,31 +425,49 @@ export default function BBPS() {
                 <label>
                   <span>Utility / Account number</span>
                   <input
-                    value={form.utilityAccNo}
-                    onChange={(e) => setForm((f) => ({ ...f, utilityAccNo: e.target.value }))}
+                    value={bbpsForm.utilityAccNo}
+                    onChange={(e) => setBbpsForm((f) => ({ ...f, utilityAccNo: e.target.value }))}
                     placeholder="Account or consumer number"
                     disabled={loading}
+                    required
                   />
                 </label>
                 <label>
                   <span>Customer mobile</span>
                   <input
-                    value={form.customerMobile}
-                    onChange={(e) => setForm((f) => ({ ...f, customerMobile: e.target.value }))}
+                    value={bbpsForm.customerMobile}
+                    onChange={(e) => setBbpsForm((f) => ({ ...f, customerMobile: e.target.value }))}
                     placeholder="10-digit mobile"
                     maxLength={10}
                     disabled={loading}
+                    required
                   />
                 </label>
                 <label>
                   <span>Sender name (optional)</span>
                   <input
-                    value={form.senderName}
-                    onChange={(e) => setForm((f) => ({ ...f, senderName: e.target.value }))}
+                    value={bbpsForm.senderName}
+                    onChange={(e) => setBbpsForm((f) => ({ ...f, senderName: e.target.value }))}
                     placeholder="Your name"
                     disabled={loading}
                   />
                 </label>
+                {isRechargeCategory(selectedCategoryId) && (
+                  <label>
+                    <span>Amount (₹)</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.01"
+                      value={bbpsForm.amount}
+                      onChange={(e) => setBbpsForm((f) => ({ ...f, amount: e.target.value }))}
+                      placeholder="Enter amount"
+                      disabled={loading}
+                      required
+                    />
+                  </label>
+                )}
+
                 <button className="btn primary" type="submit" disabled={loading}>
                   {loading ? "Fetching..." : "Fetch bill"}
                 </button>
@@ -425,14 +483,38 @@ export default function BBPS() {
                     {(() => {
                       const raw = billResult.data?.data ?? billResult.data ?? billResult;
                       const cleaned = sanitizePreview(raw);
-                      if (!cleaned) {
-                        return (
-                          <div className="muted">
-                            No bill details returned from provider. Please verify inputs and try again.
-                          </div>
-                        );
-                      }
-                      return <pre className="bbps-code">{JSON.stringify(cleaned, null, 2)}</pre>;
+                      return (
+                        <div className="bbps-details-list">
+                          {cleaned.utilitycustomername && (
+                            <div className="bbps-kv">
+                              <strong>Customer Name:</strong> <span>{cleaned.utilitycustomername}</span>
+                            </div>
+                          )}
+                          {cleaned.customer_id && (
+                            <div className="bbps-kv">
+                              <strong>Customer ID:</strong> <span>{cleaned.customer_id}</span>
+                            </div>
+                          )}
+                          {cleaned.postalcode && (
+                            <div className="bbps-kv">
+                              <strong>Postal Code:</strong> <span>{cleaned.postalcode}</span>
+                            </div>
+                          )}
+                          {cleaned.amount && (
+                            <div className="bbps-kv">
+                              <strong>Bill Amount:</strong> <span>₹{cleaned.amount}</span>
+                            </div>
+                          )}
+                          {cleaned.duedate && (
+                            <div className="bbps-kv">
+                              <strong>Due Date:</strong> <span>{cleaned.duedate}</span>
+                            </div>
+                          )}
+                          {!cleaned.utilitycustomername && !cleaned.amount && (
+                            <div className="muted">Bill fetched successfully. Please proceed to payment.</div>
+                          )}
+                        </div>
+                      );
                     })()}
                     {billResult.data?.data?.amount && (
                       <div className="bbps-kv">
@@ -455,8 +537,8 @@ export default function BBPS() {
                     type="number"
                     min="0.01"
                     step="0.01"
-                    value={form.amount}
-                    onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                    value={bbpsForm.amount}
+                    onChange={(e) => setBbpsForm((f) => ({ ...f, amount: e.target.value }))}
                     placeholder="Amount"
                     required
                     disabled={loading}
@@ -467,7 +549,7 @@ export default function BBPS() {
                 </button>
               </form>
               <p className="muted">
-                Use the same utility account and mobile as above. Fetch bill first to see due amount.
+                Fetch bill first to see due amount, then pay.
               </p>
 
               {payResult && (
@@ -493,46 +575,74 @@ export default function BBPS() {
         <section className="section">
           <h3>PPI – DigiKhata transaction</h3>
           <p className="muted">
-            Initiate a prepaid payment instrument (PPI) transaction via DigiKhata. Use sender mobile, recipient account
-            and amount.
+            Initiate a prepaid payment instrument (PPI) transaction via DigiKhata.
           </p>
 
-          <form className="form inline" onSubmit={handlePpiSubmit}>
-            <label>
-              <span>Sender mobile</span>
-              <input
-                value={form.customerMobile}
-                onChange={(e) => setForm((f) => ({ ...f, customerMobile: e.target.value }))}
-                placeholder="10-digit mobile"
-                maxLength={10}
-                disabled={loading}
-              />
-            </label>
-            <label>
-              <span>Recipient account / wallet ID</span>
-              <input
-                value={form.utilityAccNo}
-                onChange={(e) => setForm((f) => ({ ...f, utilityAccNo: e.target.value }))}
-                placeholder="Account or wallet identifier"
-                disabled={loading}
-              />
-            </label>
-            <label>
-              <span>Amount (₹)</span>
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={form.amount}
-                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                placeholder="Amount"
-                required
-                disabled={loading}
-              />
-            </label>
-            <button className="btn primary" type="submit" disabled={loading}>
-              {loading ? "Processing..." : "Initiate PPI transaction"}
-            </button>
+          <form className="form" onSubmit={handlePpiSubmit}>
+            <div className="form inline">
+              <label>
+                <span>Sender mobile</span>
+                <input
+                  value={ppiForm.senderMobile}
+                  onChange={(e) => setPpiForm((f) => ({ ...f, senderMobile: e.target.value }))}
+                  placeholder="10-digit mobile"
+                  maxLength={10}
+                  disabled={loading}
+                  required
+                />
+              </label>
+              <div style={{ marginBottom: "0.25rem" }}>
+                <button className="btn" type="button" onClick={loadRecipients} disabled={loading} style={{ width: "100%" }}>
+                  Load Recipients
+                </button>
+              </div>
+
+              <label>
+                <span>Recipient account / ID</span>
+                {recipients.length > 0 ? (
+                  <select
+                    value={ppiForm.recipientAccount}
+                    onChange={(e) => setPpiForm((f) => ({ ...f, recipientAccount: e.target.value }))}
+                    disabled={loading}
+                  >
+                    <option value="">Select recipient</option>
+                    {recipients.map((r) => (
+                      <option key={r.recipient_id} value={r.recipient_id}>
+                        {r.name} ({r.mobile})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={ppiForm.recipientAccount}
+                    onChange={(e) => setPpiForm((f) => ({ ...f, recipientAccount: e.target.value }))}
+                    placeholder="Recipient ID"
+                    disabled={loading}
+                    required
+                  />
+                )}
+              </label>
+
+              <label>
+                <span>Amount (₹)</span>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={ppiForm.amount}
+                  onChange={(e) => setPpiForm((f) => ({ ...f, amount: e.target.value }))}
+                  placeholder="Amount"
+                  required
+                  disabled={loading}
+                />
+              </label>
+            </div>
+
+            <div style={{ marginTop: "1rem", textAlign: "right" }}>
+              <button className="btn primary" type="submit" disabled={loading} style={{ minWidth: "200px" }}>
+                {loading ? "Processing..." : "Initiate PPI transaction"}
+              </button>
+            </div>
           </form>
 
           {ppiResult && (
