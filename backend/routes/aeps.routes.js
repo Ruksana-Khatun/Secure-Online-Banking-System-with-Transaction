@@ -16,10 +16,11 @@ import {
 
 const router = Router();
 
-// ✅ Rate limiter — fake registrations rokne ke liye
+// ✅ Rate limited registration with auth (skip for dev/mock)
 const registerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5,                    // 5 attempts per IP
+  skip: (req) => process.env.NODE_ENV === 'development' || process.env.AEPS_MODE === 'mock',
   message: {
     success: false,
     message: "Too many requests. Please try again after 15 minutes.",
@@ -39,8 +40,8 @@ const otpLimiter = rateLimit({
 // Public Routes
 // ─────────────────────────────────────────────
 
-// ✅ Rate limited registration
-router.post("/agent/register", registerLimiter, registerAepsAgent);
+// ✅ Rate limited registration with auth (correct order)
+router.post("/agent/register", requireAuth, registerLimiter, registerAepsAgent);
 
 // ─────────────────────────────────────────────
 // Protected Routes (Auth Required)

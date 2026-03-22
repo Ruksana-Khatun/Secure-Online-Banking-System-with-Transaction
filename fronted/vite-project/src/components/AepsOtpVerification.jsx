@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Input, Button, Card, message, Typography, Alert, Tag } from 'antd';
-import { MobileOutlined, SafetyOutlined, ShopOutlined } from '@ant-design/icons';
+import { MobileOutlined, SafetyOutlined, ShopOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 // ✅ Bug Fix #3: axios hataya, project ka request.js use karo
 import { useAuth } from '../auth/useAuth';
@@ -137,7 +137,7 @@ const AepsOtpVerification = () => {
         {/* Outlet ID */}
         {agentData?.outletId && (
           <Alert
-            message={
+            title={
               <div style={{ textAlign: 'center' }}>
                 <ShopOutlined style={{ color: '#52c41a', marginRight: '8px' }} />
                 <Text strong>Your Outlet ID: </Text>

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../api/request";
 import { useAuth } from "../auth/useAuth";
+import { Tag } from 'antd';
+import { CheckCircleOutlined } from '@ant-design/icons';
 
 function formatMoney(amount, currency) {
   if (typeof amount !== "number") return `${amount ?? 0} ${currency || ""}`.trim();
@@ -219,13 +221,12 @@ export default function Dashboard() {
       );
     }
 
-    // ✅ status === "approved" — Withdrawal + History dikhao
+    // status === "approved" — Withdrawal + History dikhao
     return (
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
         {/* Agent Info */}
         <div className="card" style={aepsStyles.card}>
-          <div style={aepsStyles.icon}>✅</div>
-          <h4 style={aepsStyles.cardTitle}>Agent Active</h4>
+          <h4 style={aepsStyles.cardTitle}>Agent Status</h4>
           <div style={aepsStyles.agentInfo}>
             <span>Outlet: <strong>{aepsAgent.outletId}</strong></span>
             <span>KYC: <strong style={{ color: '#52c41a' }}>Complete</strong></span>
@@ -234,10 +235,11 @@ export default function Dashboard() {
 
         {/* Cash Withdrawal */}
         <div className="card" style={aepsStyles.card}>
+          <div style={aepsStyles.icon}> </div>
           <div style={aepsStyles.icon}>💰</div>
           <h4 style={aepsStyles.cardTitle}>Cash Withdrawal</h4>
           <p style={aepsStyles.cardDesc}>
-            Biometric verification se customer ka cash nikalo
+            Withdraw cash from customer bank account
           </p>
           <button
             className="btn primary"
@@ -254,7 +256,7 @@ export default function Dashboard() {
           <div style={aepsStyles.icon}>📊</div>
           <h4 style={aepsStyles.cardTitle}>Transaction History</h4>
           <p style={aepsStyles.cardDesc}>
-            AEPS transactions aur commission reports dekho
+            View transactions and commission earnings
           </p>
           <button
             className="btn secondary"
@@ -436,8 +438,7 @@ export default function Dashboard() {
       {/* ✅ AEPS Section — Conditional */}
       <section className="section">
         <div className="section-header">
-          <h3>AEPS Cash Withdrawal Services</h3>
-          <span className="badge badge-new">New</span>
+          <h3>Banking Services</h3>
         </div>
         {renderAepsSection()}
       </section>

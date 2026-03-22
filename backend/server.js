@@ -64,12 +64,17 @@ app.options("*", cors());
 // ─────────────────────────────────────────────
 // Rate Limiters
 // ─────────────────────────────────────────────
+
+// Development/Mock mode bypass
+const isDevelopmentOrMock = process.env.NODE_ENV === 'development' || process.env.AEPS_MODE === 'mock';
+
 const authLimiter = rateLimit({
   windowMs:       15 * 60 * 1000, // 15 min
   max:            30,
   standardHeaders: true,
   legacyHeaders:  false,
   message: { success: false, message: "Too many requests, try again later." },
+  skip: (req) => isDevelopmentOrMock, // Skip rate limiter in dev/mock mode
 });
 
 // ✅ Bug Fix #3: apiLimiter ab use ho raha hai
@@ -79,6 +84,7 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders:  false,
   message: { success: false, message: "Too many requests, try again later." },
+  skip: (req) => isDevelopmentOrMock, // Skip rate limiter in dev/mock mode
 });
 
 const aepsLimiter = rateLimit({
@@ -87,6 +93,7 @@ const aepsLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders:  false,
   message: { success: false, message: "Too many AEPS requests, try again later." },
+  skip: (req) => isDevelopmentOrMock, // Skip AEPS rate limiter in dev/mock mode
 });
 
 // ─────────────────────────────────────────────

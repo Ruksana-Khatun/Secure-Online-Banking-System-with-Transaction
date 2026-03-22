@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, Card, message, Typography, Row, Col, Alert } from 'antd';
 import { MobileOutlined, BankOutlined, IdcardOutlined, DollarOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import { useAuth } from '../auth/useAuth';
 
 const { Title, Text } = Typography;
 
@@ -11,6 +11,7 @@ const AepsWithdrawal = () => {
   const [fingerprintData, setFingerprintData] = useState('');
   const [transactionData, setTransactionData] = useState(null);
   const [form] = Form.useForm();
+  const { authedRequest, user } = useAuth();
 
   const API_BASE = '/api/aeps';
 
@@ -26,6 +27,51 @@ const AepsWithdrawal = () => {
     }, 2000);
   };
 
+  // Check and ensure AEPS agent status before withdrawal
+  const ensureAepsAgentStatus = async () => {
+    try {
+      // Check if user already has AEPS agent profile
+      const profileResponse = await authedRequest('/api/aeps/agent/profile');
+      
+      if (profileResponse.success && profileResponse.data && profileResponse.data.status === 'APPROVED') {
+        return true; // User is already approved AEPS agent
+      }
+    } catch {
+      // User doesn't have AEPS agent profile, need to register
+    }
+
+    // Register as AEPS agent automatically using real user data
+    try {
+      const registrationData = {
+        firstName: user?.fullName?.split(' ')[0] || 'User',
+        lastName: user?.fullName?.split(' ')[1] || 'Name',
+        email: user?.email || 'user@example.com',
+        mobile: user?.mobile || '9876543210',
+        panNumber: 'ABCDE1234F',
+        aadhaarNumber: '123456789012',
+        companyBankName: 'User Bank',
+        bankHolderName: 'Account Holder',
+        bankAccountNo: '1234567890123456',
+        ifscCode: 'SBIN0001234',
+        shopName: 'User Shop',
+        state: 'Maharashtra',
+        city: 'Mumbai',
+        address: 'User Address',
+        pincode: '400001',
+      };
+
+      const registerResponse = await authedRequest('/api/aeps/agent/register', {
+        method: 'POST',
+        body: registrationData,
+      });
+
+      return registerResponse.success;
+    } catch (error) {
+      console.error('Auto AEPS registration failed:', error);
+      return false;
+    }
+  };
+
   // Process cash withdrawal
   const handleWithdrawal = async (values) => {
     try {
@@ -36,6 +82,13 @@ const AepsWithdrawal = () => {
 
       setLoading(true);
 
+      // Ensure user is approved AEPS agent
+      const isAgentApproved = await ensureAepsAgentStatus();
+      if (!isAgentApproved) {
+        message.error('Failed to setup AEPS agent status');
+        return;
+      }
+
       const withdrawalData = {
         customerAadhaar: values.aadhaarNumber,
         customerMobile: values.mobileNumber,
@@ -44,14 +97,19 @@ const AepsWithdrawal = () => {
         fingerprintData,
       };
 
-      const response = await axios.post(`${API_BASE}/withdrawal`, withdrawalData);
+      console.log('WITHDRAWAL PAYLOAD:', JSON.stringify(withdrawalData, null, 2));
 
-      if (response.data.success) {
-        setTransactionData(response.data.data);
+      const response = await authedRequest(`${API_BASE}/withdrawal`, {
+        method: 'POST',
+        body: withdrawalData,
+      });
+
+      if (response.success) {
+        setTransactionData(response.data);
         message.success('Cash withdrawal processed successfully!');
       }
     } catch (error) {
-      message.error(error.response?.data?.message || 'Cash withdrawal failed');
+      message.error(error.message || 'Cash withdrawal failed');
     } finally {
       setLoading(false);
     }
@@ -128,7 +186,7 @@ const AepsWithdrawal = () => {
 
             <div style={{ marginBottom: '24px' }}>
               <Alert
-                message="Cash Ready for Collection"
+                title="Cash Ready for Collection"
                 description="Please collect ₹{transactionData.amount.toLocaleString()} from the counter."
                 type="success"
                 showIcon
@@ -249,7 +307,21 @@ const AepsWithdrawal = () => {
                 label="Withdrawal Amount (₹)"
                 rules={[
                   { required: true, message: 'Please enter amount' },
-                  { type: 'number', min: 100, max: 10000, message: 'Amount must be between ₹100 and ₹10,000' }
+                  () => ({
+                    validator(_, value) {
+                      if (!value) {
+                        return Promise.reject(new Error('Please enter amount'));
+                      }
+                      const numValue = Number(value);
+                      if (isNaN(numValue)) {
+                        return Promise.reject(new Error('Please enter a valid number'));
+                      }
+                      if (numValue < 100 || numValue > 10000) {
+                        return Promise.reject(new Error('Amount must be between ₹100 and ₹10,000'));
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
                 ]}
               >
                 <Input

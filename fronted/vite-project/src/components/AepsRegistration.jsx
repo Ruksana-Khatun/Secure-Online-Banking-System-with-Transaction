@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, Card, Steps, message, Select, Row, Col, Divider, Space, Typography, Alert, Modal } from 'antd';
 import { UserOutlined, BankOutlined, PhoneOutlined, MailOutlined, IdcardOutlined, ShopOutlined, HomeOutlined, EnvironmentOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/useAuth';
 
 const { Step } = Steps;
 const { Option } = Select;
@@ -14,6 +14,7 @@ const AepsRegistration = () => {
   const [formData, setFormData] = useState({});
   const [form] = Form.useForm();
   const navigate = useNavigate();
+  const { authedRequest } = useAuth();
 
   const API_BASE = '/api/aeps';
 
@@ -61,13 +62,29 @@ const AepsRegistration = () => {
       console.log("[FRONTEND] Mobile:", allData.mobile, "Email:", allData.email);
 
       console.log("[FRONTEND] Making POST request...");
-      const response = await axios.post(`${API_BASE}/agent/register`, allData);
+      const storedAuth = localStorage.getItem('sb_auth_v1');
+      const authData = storedAuth ? JSON.parse(storedAuth) : null;
+      console.log('STORED AUTH:', authData);
+      console.log('ACCESS TOKEN BEING SENT:', authData?.accessToken);
+      const response = await authedRequest(`${API_BASE}/agent/register`, {
+        method: 'POST',
+        body: allData,
+      });
       console.log("[FRONTEND] Response status:", response.status);
       console.log("[FRONTEND] Response data:", response.data);
+      console.log("[FRONTEND] Full response object:", JSON.stringify(response, null, 2));
 
-      if (response.data.success) {
-        const { outletId, agentId, mobile } = response.data.data;
+      if (response.success && response.data.agentId) {
+        const { outletId, agentId, mobile } = response.data;
         console.log("[FRONTEND] Success! Outlet ID:", outletId, "Agent ID:", agentId);
+        
+        // Save agent data to localStorage for withdrawal use
+        localStorage.setItem('aepsAgentData', JSON.stringify({
+          agentId,
+          outletId,
+          status: response.data.status,
+          mobile
+        }));
 
         // Show success modal with Outlet ID
         Modal.success({

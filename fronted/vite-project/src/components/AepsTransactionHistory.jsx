@@ -188,7 +188,7 @@ const AepsTransactionHistory = () => {
                 title="Total Transactions"
                 value={stats.totalTransactions}
                 prefix={<HistoryOutlined />}
-                valueStyle={{ color: '#1890ff' }}
+                styles={{ content: { color: '#1890ff' } }}
               />
             </Card>
           </Col>

@@ -3,6 +3,7 @@ import AepsAgent from "../models/AepsAgent.model.js";
 import AepsTransaction from "../models/AepsTransaction.model.js";
 // ✅ Bug Fix #1: Removed unused `User` import
 import aepsService from "../services/aeps.service.js";
+import mockAepsService from "../services/mockAepsService.js";
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -72,6 +73,9 @@ function validateRegistrationFields({
 // ─────────────────────────────────────────────
 
 export async function registerAepsAgent(req, res) {
+  console.log('AUTH HEADER:', req.headers.authorization);
+  console.log('REQ USER IN CONTROLLER:', req.user);
+  
   console.log("[AEPS] ========== REGISTRATION REQUEST START ==========");
 
   if (!req.body || Object.keys(req.body).length === 0) {
@@ -122,24 +126,24 @@ export async function registerAepsAgent(req, res) {
     });
 
     if (existingAgent) {
-      if (existingAgent.status === "PENDING") {
-        return res.json({
-          success: true,
-          message: "Application already submitted and pending approval",
-          data: { agentId: existingAgent._id, status: existingAgent.status },
-        });
-      } else if (existingAgent.status === "APPROVED") {
-        return res.json({
-          success: true,
-          message: "Agent already registered and approved",
-          data: { agentId: existingAgent._id, status: existingAgent.status },
-        });
-      } else {
-        return res.json({
-          success: false,
-          message: "Agent registration was rejected. Please contact support.",
-        });
+      // If agent exists but no outletId, add it
+      if (!existingAgent.outletId) {
+        existingAgent.outletId = generateOutletId();
+        await existingAgent.save();
+        console.log("[AEPS] Added outletId to existing agent:", existingAgent.outletId);
       }
+      
+      return res.status(200).json({
+        success: true,
+        message: "Agent already registered and approved",
+        data: {
+          agentId: existingAgent._id,
+          outletId: existingAgent.outletId,
+          status: existingAgent.status,
+          email: existingAgent.email,
+          mobile: existingAgent.mobile,
+        },
+      });
     }
 
     const outletId = generateOutletId();
@@ -167,30 +171,40 @@ export async function registerAepsAgent(req, res) {
       shopName,
       outletId,
       status:     "APPROVED",
+      kycStatus:  "DONE",           // ← FIXED: Set KYC as completed
       approvedAt: new Date(),
     });
 
     console.log("[AEPS] Agent created:", agent._id);
+    console.log("[AEPS] Agent outletId:", agent.outletId);
 
     // Call EKO API for activation
     let ekoAgentId = null;
     try {
-      const ekoResponse = await aepsService.activateAgent({
-        firstName, lastName, mobile, email,
-        panNumber:    panNumber.toUpperCase(),
-        aadhaarNumber,
-        bankAccountNo,
-        ifscCode:     ifscCode.toUpperCase(),
-        companyBankName,
-        state, city, pincode, shopName,
-        gstNumber: gstNumber || "",
-        outletId,
-      });
+      let ekoResponse;
+      
+      if (mockAepsService.isMockEnabled()) {
+        // Use mock service for agent activation
+        ekoResponse = await mockAepsService.checkAgentStatus(req.user?.id);
+      } else {
+        // Use real EKO service
+        ekoResponse = await aepsService.activateAgent({
+          firstName, lastName, mobile, email,
+          panNumber:    panNumber.toUpperCase(),
+          aadhaarNumber,
+          bankAccountNo,
+          ifscCode:     ifscCode.toUpperCase(),
+          companyBankName,
+          state, city, pincode, shopName,
+          gstNumber: gstNumber || "",
+          outletId,
+        });
+      }
 
       console.log("[AEPS] EKO response:", JSON.stringify(ekoResponse, null, 2));
 
       if (ekoResponse.success) {
-        ekoAgentId = ekoResponse.data?.agent_id;
+        ekoAgentId = ekoResponse.data?.agentId || ekoResponse.data?.agent_id;
         agent.ekoAgentId = ekoAgentId;
         agent.apiResponse = ekoResponse.data; // Raw response save karo
         await agent.save();
@@ -208,7 +222,7 @@ export async function registerAepsAgent(req, res) {
       message: "AEPS Agent registered and approved successfully",
       data: {
         agentId:    agent._id,
-        outletId,
+        outletId:   agent.outletId,  // ← FIXED: Use agent.outletId
         status:     "APPROVED",
         email:      agent.email,
         mobile:     agent.mobile,
@@ -364,6 +378,9 @@ export async function authenticateAepsAgent(req, res) {
 
 export async function cashWithdrawal(req, res) {
   try {
+    console.log('[WITHDRAWAL REQUEST BODY:', req.body);
+    console.log('[WITHDRAWAL REQ USER:', req.user);
+    
     const {
       customerAadhaar,
       customerMobile,
@@ -393,12 +410,19 @@ export async function cashWithdrawal(req, res) {
     const agent = await AepsAgent.findOne({
       userId: req.user.id,
       status: "APPROVED",
+      kycStatus: "DONE",   // ← FIXED: Check KYC status too
     });
 
     if (!agent)          throw badRequest("Agent not found or not approved");
     if (!agent.outletId) throw badRequest("Outlet ID not generated");
 
-    if (aepsService.isMockEnabled()) {
+    if (mockAepsService.isMockEnabled()) {
+      const isValid = mockAepsService.verifyMockFingerprint(fingerprintData);
+      if (!isValid) {
+        throw badRequest("Invalid fingerprint. Use MOCK_FINGER_DATA for mock mode.");
+      }
+    } else {
+      // Use real fingerprint verification
       const isValid = aepsService.verifyMockFingerprint(fingerprintData);
       if (!isValid) {
         throw badRequest("Invalid fingerprint. Use MOCK_FINGER_DATA for mock mode.");
@@ -421,15 +445,30 @@ export async function cashWithdrawal(req, res) {
 
     // ✅ Bug Fix #9: Double save fix — ek hi jagah save hoga
     try {
-      const ekoResponse = await aepsService.cashWithdrawal({
-        agentId:         agent.ekoAgentId || agent.outletId,
-        customerAadhaar,
-        customerMobile,
-        bankAccountNo,
-        amount,
-        clientRefId,
-        fingerprintData,
-      });
+      let ekoResponse;
+      
+      if (mockAepsService.isMockEnabled()) {
+        // Use mock service in mock mode
+        ekoResponse = await mockAepsService.cashWithdrawal({
+          customerAadhaar,
+          customerMobile,
+          bankAccountNo,
+          amount,
+          clientRefId,
+          fingerprintData,
+        });
+      } else {
+        // Use real AEPS service
+        ekoResponse = await aepsService.cashWithdrawal({
+          agentId:         agent.ekoAgentId || agent.outletId,
+          customerAadhaar,
+          customerMobile,
+          bankAccountNo,
+          amount,
+          clientRefId,
+          fingerprintData,
+        });
+      }
 
       if (ekoResponse.success) {
         transaction.status           = "SUCCESS";
@@ -450,6 +489,7 @@ export async function cashWithdrawal(req, res) {
             commission:    transaction.commission,
             status:        transaction.status,
             processedAt:   transaction.completedAt,
+            rrn:           ekoResponse.data?.rrn,
           },
         });
       } else {

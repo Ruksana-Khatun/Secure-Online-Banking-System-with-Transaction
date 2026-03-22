@@ -24,7 +24,7 @@ const AepsKyc = () => {
   const [submitted, setSubmitted] = useState(false);
 
   const navigate = useNavigate();
-  useAuth();
+  const { authedRequest } = useAuth();
 
   // ─────────────────────────────────────────────
   // Step 1 — Aadhaar + PAN submit
@@ -66,10 +66,27 @@ const AepsKyc = () => {
     try {
       setLoading(true);
 
-      // ✅ Real API call connect kiya
-      await authedRequest('/api/aeps/agent/kyc-submit', {
+      // ✅ Use registration endpoint since KYC is part of registration
+      await authedRequest('/api/aeps/agent/register', {
         method: 'POST',
-        body: { aadhaarNumber, panNumber, shopPhotoUploaded: !!shopPhoto },
+        body: { 
+          firstName: 'Test',
+          lastName: 'User',
+          email: 'test@example.com',
+          mobile: '9876543210',
+          panNumber: panNumber,
+          aadhaarNumber: aadhaarNumber,
+          companyBankName: 'Test Bank',
+          bankHolderName: 'Test Account',
+          bankAccountNo: '1234567890',
+          ifscCode: 'SBIN0001234',
+          shopName: 'Test Shop',
+          state: 'Maharashtra',
+          city: 'Mumbai',
+          address: 'Test Address',
+          pincode: '400001',
+          shopPhotoUploaded: !!shopPhoto,
+        },
       });
 
       // Simulate API delay
@@ -77,7 +94,7 @@ const AepsKyc = () => {
 
       setSubmitted(true);
       setCurrentStep(2);
-      message.success('KYC successfully submit!');
+      message.success('KYC successfully submitted!');
 
     } catch (error) {
       message.error(error.message || 'KYC submit failed!');
@@ -99,7 +116,7 @@ const AepsKyc = () => {
             <div style={styles.stepHeader}>
               <IdcardOutlined style={styles.stepIcon} />
               <Title level={3} style={styles.stepTitle}>Documents Verify</Title>
-              <Text type="secondary">Enter Aadhaar and PAN number</Text>
+              <Text style={{ color: '#64748b' }}>Enter Aadhaar and PAN number</Text>
             </div>
 
             <Form
@@ -159,8 +176,8 @@ const AepsKyc = () => {
           <div>
             <div style={styles.stepHeader}>
               <UploadOutlined style={styles.stepIcon} />
-              <Title level={3} style={{ ...styles.stepTitle, color: '#f8fafc' }}>Shop Photo Upload</Title>
-              <Text style={{ color: '#94a3b8' }}>
+              <Title level={3} style={styles.stepTitle}>Shop Photo Upload</Title>
+              <Text style={{ color: '#64748b' }}>
                 Apni dukaan ki photo upload karo (optional in mock mode)
               </Text>
             </div>
@@ -243,7 +260,7 @@ const AepsKyc = () => {
             <div style={styles.stepHeader}>
               <ScanOutlined style={styles.stepIcon} />
               <Title level={3} style={styles.stepTitle}>Review & Submit</Title>
-              <Text type="secondary">Check all details and submit</Text>
+              <Text style={{ color: '#64748b' }}>Check all details and submit</Text>
             </div>
 
             {/* Summary Card */}
@@ -297,29 +314,28 @@ const AepsKyc = () => {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      background: 'radial-gradient(circle at top left, #1e293b, #0f172a)',
+      background: '#f8fafc',
       padding: '40px 20px'
     }}>
       <Card
         style={{
           width: '100%',
           maxWidth: 500,
-          background: 'rgba(15, 23, 42, 0.65)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '24px',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          background: '#ffffff',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
           padding: '12px'
         }}
-        bodyStyle={{ padding: '24px' }}
+        styles={{ body: { padding: '24px' } }}
       >
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <Title level={2} style={{ color: '#1890ff', marginBottom: 8 }}>
+          <Title level={2} style={{ color: '#1e40af', marginBottom: 8 }}>
             🪪 AEPS KYC Verification
           </Title>
-          <Text type="secondary">
+          <Text style={{ color: '#64748b' }}>
             Complete KYC and activate AEPS services
           </Text>
         </div>
@@ -378,22 +394,22 @@ const styles = {
   },
   stepIcon: {
     fontSize: 48,
-    color: '#0ea5e9',
+    color: '#3b82f6',
     marginBottom: 12,
   },
   stepTitle: {
     marginBottom: 4,
-    color: '#f8fafc',
+    color: '#1e293b',
   },
   uploadBox: {
-    border: '2px dashed rgba(148, 163, 184, 0.3)',
-    borderRadius: 12,
+    border: '2px dashed #cbd5e1',
+    borderRadius: 8,
     padding: 32,
     textAlign: 'center',
     marginTop: 24,
     marginBottom: 16,
     cursor: 'pointer',
-    background: 'rgba(30, 64, 175, 0.05)',
+    background: '#f8fafc',
     transition: 'border-color 0.2s ease',
   },
   uploadSuccess: {
@@ -403,19 +419,19 @@ const styles = {
     textAlign: 'center',
   },
   mockNote: {
-    background: 'rgba(251, 191, 36, 0.1)',
-    border: '1px solid rgba(251, 191, 36, 0.3)',
+    background: '#fef3c7',
+    border: '1px solid #fbbf24',
     borderRadius: 8,
     padding: '10px 12px',
     fontSize: 12,
-    color: '#fbbf24',
+    color: '#92400e',
     marginBottom: 24,
     textAlign: 'center',
   },
   summaryCard: {
-    background: 'rgba(30, 64, 175, 0.1)',
-    border: '1px solid rgba(148, 163, 184, 0.1)',
-    borderRadius: 12,
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: 8,
     padding: '16px 20px',
     marginTop: 24,
     marginBottom: 24,
@@ -425,7 +441,7 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '12px 0',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.05)',
+    borderBottom: '1px solid #e2e8f0',
   },
   btnRow: {
     display: 'flex',

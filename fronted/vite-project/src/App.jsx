@@ -5,7 +5,7 @@ import { RequireAdmin } from "./auth/RequireAdmin";
 import { RequireAuth } from "./auth/RequireAuth";
 import { useAuth } from "./auth/useAuth";
 import { AppShell } from "./components/AppShell";
-import SimplifiedAdmin from "./pages/SimplifiedAdmin";
+import Admin from "./pages/Admin";
 import AdminLogin from "./components/AdminLogin";
 import BBPS from "./pages/BBPS";
 import Dashboard from "./pages/Dashboard";
@@ -48,7 +48,7 @@ export default function App() {
         />
         <Route
           path="/admin"
-          element={<RequireAdmin><SimplifiedAdmin /></RequireAdmin>}
+          element={<RequireAdmin><Admin /></RequireAdmin>}
         />
       </Route>
 

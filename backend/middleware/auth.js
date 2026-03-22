@@ -6,9 +6,12 @@ export function requireAuth(req, res, next) {
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     const decoded = verifyAccess(token);
+    console.log('DECODED TOKEN:', decoded);
     req.user = decoded;
+    console.log('REQ USER:', req.user);
     next();
   } catch (e) {
+    console.error('AUTH ERROR:', e);
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
