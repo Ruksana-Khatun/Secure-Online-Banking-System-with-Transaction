@@ -65,7 +65,7 @@ app.options("*", cors());
 // Rate Limiters
 // ─────────────────────────────────────────────
 
-// Development/Mock mode bypass
+
 const isDevelopmentOrMock = process.env.NODE_ENV === 'development' || process.env.AEPS_MODE === 'mock';
 
 const authLimiter = rateLimit({
@@ -106,24 +106,21 @@ app.get("/check",  (_, res) => res.send("Server is running ✅"));
 // Routes
 // ─────────────────────────────────────────────
 
-// ✅ Bug Fix #1: AEPS routes pe limiter lagaya
+
 app.use("/api/aeps", aepsLimiter, aepsRoutes);
 
-// ✅ Bug Fix #2: Auth limiter sahi order mein
-app.use("/api/auth", authLimiter, authRoutes);
-app.use("/api/otp",  authLimiter, otpRoutes); // OTP pe bhi auth limiter
 
-// ✅ Warning Fix: Financial routes pe apiLimiter
+app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/otp",  authLimiter, otpRoutes); 
+
+
 app.use("/api/accounts",     apiLimiter, accountRoutes);
 app.use("/api/transactions",  apiLimiter, transactionRoutes);
 app.use("/api/bbps",          apiLimiter, bbpsRoutes);
 app.use("/api/ppi",           apiLimiter, digikhataPpiRoutes);
-app.use("/api/admin",         adminRoutes); // Admin ke apne auth middleware honge
+app.use("/api/admin",         adminRoutes); 
 // app.use("/",                  legacyRoutes);
 
-// ─────────────────────────────────────────────
-// DB + Server Start
-// ─────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 
 (async () => {
