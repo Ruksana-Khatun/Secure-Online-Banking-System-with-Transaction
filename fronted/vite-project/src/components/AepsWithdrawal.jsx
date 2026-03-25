@@ -187,7 +187,7 @@ const AepsWithdrawal = () => {
             <div style={{ marginBottom: '24px' }}>
               <Alert
                 title="Cash Ready for Collection"
-                description="Please collect ₹{transactionData.amount.toLocaleString()} from the counter."
+                description={`Please collect ₹${transactionData.amount.toLocaleString()} from the counter.`}
                 type="success"
                 showIcon
               />

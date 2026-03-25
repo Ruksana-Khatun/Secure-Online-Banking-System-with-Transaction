@@ -18,6 +18,7 @@ import legacyRoutes      from "./routes/legacy.routes.js";
 import bbpsRoutes        from "./routes/bbps.routes.js";
 import digikhataPpiRoutes from "./routes/digikhataPpi.routes.js";
 import aepsRoutes        from "./routes/aeps.routes.js";
+import rupikshaRoutes    from "./routes/rupiksha.routes.js";
 
 // ─────────────────────────────────────────────
 // ENV Check
@@ -119,6 +120,7 @@ app.use("/api/transactions",  apiLimiter, transactionRoutes);
 app.use("/api/bbps",          apiLimiter, bbpsRoutes);
 app.use("/api/ppi",           apiLimiter, digikhataPpiRoutes);
 app.use("/api/admin",         adminRoutes); 
+app.use("/api/rupiksha",      apiLimiter, rupikshaRoutes);
 // app.use("/",                  legacyRoutes);
 
 const PORT = process.env.PORT || 5000;
