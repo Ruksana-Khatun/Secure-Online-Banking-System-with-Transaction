@@ -20,6 +20,9 @@ import AepsKyc from "./components/AepsKyc";
 import AepsWithdrawal from "./components/AepsWithdrawal";
 import AepsTransactionHistory from "./components/AepsTransactionHistory";
 
+// Rupiksha Component
+import RupikshaOnboarding from "./components/RupikshaOnboarding";
+
 function HomeRedirect() {
   const { hydrated, isAuthenticated } = useAuth();
   if (!hydrated) return null;
@@ -58,6 +61,9 @@ export default function App() {
       <Route path="/aeps/kyc"              element={<AepsKyc />} />
       <Route path="/aeps/withdrawal"       element={<AepsWithdrawal />} />
       <Route path="/aeps/transactions"     element={<AepsTransactionHistory />} />
+
+      {/* Rupiksha Routes */}
+      <Route path="/rupiksha/onboard" element={<RequireAuth><RupikshaOnboarding /></RequireAuth>} />
 
       {/* Admin Login */}
       <Route path="/admin-login" element={<AdminLogin />} />
